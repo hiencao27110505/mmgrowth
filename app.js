@@ -643,12 +643,21 @@ function closeDetailModal() {
 // ─── Submit form (lives in the Backlog tab) ────────────────────────────
 // Quality rules — coaching, not gatekeeping. Submit is allowed even if
 // some checks fail; the PM still triages everything.
+//
+// Rule design follows Amazon's writing standards (working backwards, narrative
+// memos, "data not anecdote", Strunk & White brevity). Each field gets one
+// extra Amazonian check on top of the basic length/topic checks:
+//   - What: no marketing fluff
+//   - Why:  no weasel words
+//   - How:  no corporate jargon
 const QUALITY_CHECKS = {
   what: [
     { label: 'At least 40 characters — specific & complete',
       test: s => s.trim().length >= 40 },
     { label: 'Avoids vague verbs (improve, enhance, optimize, cải thiện…)',
-      test: s => s.trim().length > 0 && !/(improve|enhance|optimize|better|nicer|great|cải\s*thiện|tối\s*ưu|nâng\s*cao|tốt\s*hơn)/i.test(s) }
+      test: s => s.trim().length > 0 && !/(improve|enhance|optimize|better|nicer|great|cải\s*thiện|tối\s*ưu|nâng\s*cao|tốt\s*hơn)/i.test(s) },
+    { label: 'No marketing fluff (amazing, world-class, seamless, magical, đột phá…)',
+      test: s => s.trim().length > 0 && !/(amazing|awesome|world[-\s]?class|cutting[-\s]?edge|seamless|magical|revolutionary|innovative|delightful|game[-\s]?chang|next[-\s]?gen|state[-\s]?of[-\s]?the[-\s]?art|đột\s*phá|tuyệt\s*vời|đẳng\s*cấp|vượt\s*trội)/i.test(s) }
   ],
   why: [
     { label: 'At least 60 characters — gives context, not a tagline',
@@ -656,13 +665,17 @@ const QUALITY_CHECKS = {
     { label: 'Includes data — number, %, or metric (tickets, NPS, drop-off…)',
       test: s => /\d/.test(s) || /(\bnps\b|drop[-\s]?off|churn|conversion|retention|tickets|complaints|tỷ\s*lệ|phần\s*trăm)/i.test(s) },
     { label: 'Names the user/customer (user, customer, người dùng, khách hàng…)',
-      test: s => /(\busers?\b|\bcustomers?\b|người\s*dùng|khách\s*hàng|stakeholder)/i.test(s) }
+      test: s => /(\busers?\b|\bcustomers?\b|người\s*dùng|khách\s*hàng|stakeholder)/i.test(s) },
+    { label: 'No weasel words (might, perhaps, we believe, có lẽ, có thể là…) — claim it confidently',
+      test: s => s.trim().length > 0 && !/(\bmight\b|\bperhaps\b|\bpotentially\b|we\s+believe|we\s+think|it\s+seems|sort\s+of|kind\s+of|somewhat|hopefully|maybe|có\s*lẽ|có\s*thể\s*là|hình\s*như)/i.test(s) }
   ],
   how: [
     { label: 'At least 40 characters — concrete approach',
       test: s => s.trim().length >= 40 },
     { label: 'Mentions scope, MVP, or an alternative considered',
-      test: s => /(\bmvp\b|\bv1\b|\bv2\b|scope|phase|alternative|instead|trade[-\s]?off|fallback|out\s*of\s*scope|phạm\s*vi|giai\s*đoạn|lựa\s*chọn|thay\s*vì)/i.test(s) }
+      test: s => /(\bmvp\b|\bv1\b|\bv2\b|scope|phase|alternative|instead|trade[-\s]?off|fallback|out\s*of\s*scope|phạm\s*vi|giai\s*đoạn|lựa\s*chọn|thay\s*vì)/i.test(s) },
+    { label: 'No corporate jargon (synergy, leverage, ecosystem, holistic, hệ sinh thái…)',
+      test: s => s.trim().length > 0 && !/(synergy|leverage|ecosystem|holistic|paradigm|best[-\s]?in[-\s]?class|alignment|streamline|empower|robust\s+solution|move\s+the\s+needle|low[-\s]?hanging\s+fruit|bandwidth|circle\s+back|hệ\s*sinh\s*thái|cộng\s*hưởng|tối\s*ưu\s*hoá|toàn\s*diện)/i.test(s) }
   ]
 };
 
