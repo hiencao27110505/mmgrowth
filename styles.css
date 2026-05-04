@@ -188,6 +188,64 @@ a:hover { text-decoration: underline; }
   font-size: 12px; color: var(--ink-3); margin-top: 4px;
 }
 
+/* ─── Workload by owner ──────────────────────────────────────────────── */
+.workload-section {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px; margin-bottom: 16px;
+}
+.workload-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap; margin-bottom: 12px;
+}
+.workload-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; color: var(--ink-3); margin: 0;
+}
+.workload-legend {
+  display: flex; gap: 12px; flex-wrap: wrap;
+  font-size: 11px; color: var(--ink-3);
+}
+.legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.legend-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 99px;
+}
+
+.workload-list { display: flex; flex-direction: column; gap: 6px; }
+.workload-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 220px) 1fr 28px;
+  gap: 12px; align-items: center;
+}
+.workload-name {
+  font-size: 12px; color: var(--ink-2);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.workload-bar-wrap { width: 100%; }
+.workload-bar {
+  display: flex; height: 12px; border-radius: 99px;
+  background: var(--surface); overflow: hidden;
+  min-width: 12px;
+}
+.workload-seg { height: 100%; transition: opacity 0.12s ease; }
+.workload-seg:hover { opacity: 0.75; }
+.workload-count {
+  font-size: 12px; font-weight: 600; color: var(--ink-2);
+  text-align: right;
+}
+
+/* Status segment colors (also used by legend dots) */
+.seg-progress  { background: var(--blue); }
+.seg-discovery { background: var(--orange); }
+.seg-shipped   { background: var(--green); }
+.seg-blocked   { background: var(--red); }
+.seg-other     { background: var(--ink-3); }
+
+@media (max-width: 680px) {
+  .workload-row { grid-template-columns: 130px 1fr 24px; gap: 8px; }
+  .workload-name { font-size: 11px; }
+}
+
 /* ─── Tabs ────────────────────────────────────────────────────────────── */
 .tabs {
   display: flex; gap: 4px;
@@ -254,7 +312,11 @@ a:hover { text-decoration: underline; }
 .timeline::-webkit-scrollbar-thumb:hover { background: var(--ink-3); }
 
 .timeline-col {
-  flex: 0 0 320px;
+  /* Stretch to fill the available width: grow to share extra space, no shrink,
+     start at 280 px. Combined with overflow-x: auto on .timeline, narrow
+     viewports get horizontal scroll instead of cramped columns. */
+  flex: 1 0 280px;
+  min-width: 280px;
   background: var(--white); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 14px;
   scroll-snap-align: start;
@@ -328,10 +390,21 @@ a:hover { text-decoration: underline; }
 .why-empty { font-style: italic; opacity: 0.55; }
 
 .init-card-foot {
-  display: flex; gap: 6px; align-items: center; flex-shrink: 0;
+  display: flex; gap: 8px; align-items: center; flex-shrink: 0;
   font-size: 11px; color: var(--ink-3);
-  white-space: nowrap; overflow: hidden;
 }
+.card-foot-meta {
+  flex: 1; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: inline;
+}
+.card-foot-meta > * { vertical-align: baseline; }
+.card-proto-link {
+  flex-shrink: 0;
+  color: var(--momo); font-size: 11px; font-weight: 500;
+  text-decoration: none;
+}
+.card-proto-link:hover { text-decoration: underline; }
 .card-status {
   font-size: 10px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.3px;
@@ -784,7 +857,7 @@ a:hover { text-decoration: underline; }
   .header { padding: 16px; }
   .page-wrap { padding: 0 16px; }
   .header-right { width: 100%; justify-content: flex-start; }
-  .timeline-col { flex-basis: 280px; }
+  .timeline-col { flex: 1 0 260px; min-width: 260px; }
 }
 
 @media (max-width: 480px) {
@@ -794,5 +867,5 @@ a:hover { text-decoration: underline; }
   .insights-actions { justify-content: space-between; }
   .modal-card { max-height: 100vh; border-radius: 0; }
   .detail-modal-card { max-height: 100vh; border-radius: 0; }
-  .timeline-col { flex-basis: 86vw; }
+  .timeline-col { flex: 1 0 86vw; min-width: 86vw; }
 }

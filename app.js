@@ -18,7 +18,6 @@ const STATE = {
   objectives: [],
   view: 'timeline',
   fetchedAt: 0,
-  timelineGroupBy: 'month', // 'quarter' | 'month'
   synthesis: {
     stakeholder: { text: '', generatedAt: 0 },
     operational: { text: '', generatedAt: 0 }
@@ -116,16 +115,6 @@ function bindUI() {
   // Objective dropdown — show "Other" input when chosen
   document.getElementById('fObjective').addEventListener('change', (e) => {
     document.getElementById('fObjectiveOtherWrap').hidden = e.target.value !== '__other__';
-  });
-
-  // Timeline grouping toggle (Quarter / Month)
-  document.querySelectorAll('[data-timeline-group]').forEach(pill => {
-    pill.addEventListener('click', () => {
-      STATE.timelineGroupBy = pill.dataset.timelineGroup;
-      document.querySelectorAll('[data-timeline-group]').forEach(p =>
-        p.classList.toggle('is-active', p.dataset.timelineGroup === STATE.timelineGroupBy));
-      renderTimeline();
-    });
   });
 
   // Detail modal close
@@ -285,6 +274,7 @@ function loadMockData() {
 // ─── Render orchestration ──────────────────────────────────────────────
 function renderAll() {
   renderMetrics();
+  renderDeliverables();
   renderTimeline();
   renderBacklog();
   renderInsights();
@@ -322,16 +312,12 @@ function renderMetrics() {
   `).join('');
 }
 
-// ─── Timeline (grouped by Quarter or Month) ────────────────────────────
+// ─── Timeline (grouped by Month) ───────────────────────────────────────
 function renderTimeline() {
-  const groupBy = STATE.timelineGroupBy === 'month' ? 'month' : 'quarter';
-  const keyFn   = groupBy === 'month' ? monthKey   : quarterKey;
-  const labelFn = groupBy === 'month' ? monthLabel : quarterLabel;
-
   const groups = {};
   STATE.rows.forEach(r => {
-    const key = keyFn(r.When);
-    if (!groups[key]) groups[key] = { label: labelFn(r.When), rows: [] };
+    const key = monthKey(r.When);
+    if (!groups[key]) groups[key] = { label: monthLabel(r.When), rows: [] };
     groups[key].rows.push(r);
   });
 
@@ -369,25 +355,6 @@ function renderTimeline() {
   }).join('');
 
   bindCardClicks(document.getElementById('timelineColumns'));
-}
-
-function quarterKey(whenStr) {
-  const p = parseWhenToMonth(whenStr);
-  if (!p) return 'unscheduled';
-  const q = Math.floor((p.month - 1) / 3) + 1;
-  return p.year + '-Q' + q;
-}
-
-function quarterLabel(whenStr) {
-  const p = parseWhenToMonth(whenStr);
-  if (!p) return { text: 'Unscheduled', isNow: false, isPast: false };
-  const q = Math.floor((p.month - 1) / 3) + 1;
-  const today = new Date();
-  const curY = today.getFullYear();
-  const curQ = Math.floor(today.getMonth() / 3) + 1;
-  const isNow  = p.year === curY && q === curQ;
-  const isPast = p.year < curY || (p.year === curY && q < curQ);
-  return { text: 'Q' + q + ' ' + p.year, isNow, isPast };
 }
 
 // Backwards-compat shim: initCardHTML still uses mapHorizon for the
@@ -455,13 +422,13 @@ function monthLabel(whenStr) {
 
 // ─── Card template (Timeline) ──────────────────────────────────────────
 // Minimal: objective label · title (2-line clamp) · why preview (3-line clamp)
-// · foot row of plain text (status, owner, when). Equal height across all cards.
-// Click → opens detail modal with all the rich info / CTAs / missing-fields chip.
+// · foot row of plain text (status, owner, when) + subtle Prototype link.
+// Equal height across all cards. Click → opens detail modal with rich info.
 function initCardHTML(r) {
+  const protoUrl = firstUrl(r.Prototype);
   const footParts = [];
   if (r.Status) footParts.push(`<span class="card-status ${statusClass(r.Status)}">${escapeHtml(r.Status)}</span>`);
   if (r.Who)    footParts.push(`<span class="card-foot-text">${escapeHtml(r.Who)}</span>`);
-  if (r.When)   footParts.push(`<span class="card-foot-text">${escapeHtml(r.When)}</span>`);
   const foot = footParts.join('<span class="card-foot-sep">·</span>');
 
   return `
@@ -469,9 +436,74 @@ function initCardHTML(r) {
       ${r.Objective ? `<div class="init-card-objective">${escapeHtml(r.Objective)}</div>` : ''}
       <div class="init-card-title">${escapeHtml(r.What || '(no title)')}</div>
       <div class="init-card-why">${whyPreview(r.Why)}</div>
-      <div class="init-card-foot">${foot}</div>
+      <div class="init-card-foot">
+        <div class="card-foot-meta">${foot}</div>
+        ${protoUrl ? `<a class="card-proto-link" href="${escapeAttr(protoUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Prototype ↗</a>` : ''}
+      </div>
     </div>
   `;
+}
+
+// ─── Deliverables by objective (stacked bar per objective) ─────────────
+function renderDeliverables() {
+  const container = document.getElementById('deliverables');
+  if (!container) return;
+
+  // Bucket rows by Objective + status category
+  const byObj = {};
+  STATE.rows.forEach(r => {
+    const obj = (r.Objective || '').trim() || 'No objective';
+    if (!byObj[obj]) byObj[obj] = { total: 0, progress: 0, discovery: 0, shipped: 0, blocked: 0, other: 0 };
+    byObj[obj].total++;
+    byObj[obj][statusCategory(r.Status)]++;
+  });
+
+  const entries = Object.entries(byObj).sort((a, b) => b[1].total - a[1].total);
+  if (entries.length === 0) { container.innerHTML = ''; return; }
+
+  const maxTotal = entries[0][1].total;
+  const segOrder = ['progress', 'discovery', 'shipped', 'blocked', 'other'];
+
+  const rowsHTML = entries.map(([objective, c]) => {
+    const segments = segOrder
+      .filter(k => c[k] > 0)
+      .map(k => `<div class="workload-seg seg-${k}" style="flex-grow:${c[k]}" title="${c[k]} ${k}"></div>`)
+      .join('');
+    const widthPct = Math.max(8, (c.total / maxTotal) * 100);
+    return `
+      <div class="workload-row">
+        <div class="workload-name" title="${escapeAttr(objective)}">${escapeHtml(objective)}</div>
+        <div class="workload-bar-wrap">
+          <div class="workload-bar" style="width:${widthPct}%">${segments}</div>
+        </div>
+        <div class="workload-count">${c.total}</div>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="workload-section">
+      <div class="workload-head">
+        <h3 class="workload-title">Deliverables by objective</h3>
+        <div class="workload-legend">
+          <span class="legend-item"><span class="legend-dot seg-progress"></span>In progress</span>
+          <span class="legend-item"><span class="legend-dot seg-discovery"></span>Discovery</span>
+          <span class="legend-item"><span class="legend-dot seg-shipped"></span>Shipped</span>
+          <span class="legend-item"><span class="legend-dot seg-blocked"></span>Blocked</span>
+        </div>
+      </div>
+      <div class="workload-list">${rowsHTML}</div>
+    </div>
+  `;
+}
+
+function statusCategory(status) {
+  const s = String(status || '').toLowerCase();
+  if (/ship|done|launch|complete|live/.test(s))         return 'shipped';
+  if (/progress|doing|wip|building|develop/.test(s))     return 'progress';
+  if (/discov|explore|research|backlog|todo|planning/.test(s)) return 'discovery';
+  if (/block|stuck|hold|paus/.test(s))                   return 'blocked';
+  return 'other';
 }
 
 // ─── Card helpers ───────────────────────────────────────────────────────
