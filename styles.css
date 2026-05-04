@@ -584,13 +584,67 @@ a:hover { text-decoration: underline; }
   color: var(--ink-3); font-size: 14px;
 }
 
-/* ─── Backlog: in-tab submit form ────────────────────────────────────── */
+/* ─── Backlog: in-tab submit form + writing tips side-by-side ────────── */
+.backlog-form-wrapper {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 16px;
+  margin-bottom: 28px;
+  align-items: start;
+}
+@media (max-width: 880px) {
+  .backlog-form-wrapper { grid-template-columns: 1fr; }
+}
+
 .backlog-form-card {
   background: var(--white); border: 1px solid var(--border);
   border-left: 3px solid var(--momo);
   border-radius: var(--radius);
   padding: 24px;
-  margin-bottom: 28px;
+}
+
+/* Writing-tips panel */
+.writing-tips-card {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  position: sticky; top: 16px;
+}
+@media (max-width: 880px) {
+  .writing-tips-card { position: static; }
+}
+.tips-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: 18px; font-weight: 400;
+  margin: 0 0 4px; color: var(--ink);
+}
+.tips-intro {
+  font-size: 12px; color: var(--ink-3);
+  margin: 0 0 16px; line-height: 1.55;
+}
+.tips-section {
+  margin-bottom: 14px; padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.tips-section:last-of-type { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+.tips-section-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; color: var(--momo);
+  margin: 0 0 6px;
+}
+.tips-section p {
+  font-size: 12.5px; color: var(--ink-2);
+  line-height: 1.55; margin: 0 0 6px;
+}
+.tips-section p:last-child { margin-bottom: 0; }
+.tips-section em {
+  font-style: italic; color: var(--ink); font-weight: 500;
+}
+.tips-footer {
+  font-size: 12px; font-style: italic;
+  color: var(--ink-3);
+  margin: 16px 0 0; padding-top: 14px;
+  border-top: 1px solid var(--border);
 }
 .backlog-form-head { margin-bottom: 16px; }
 .backlog-form-title {
