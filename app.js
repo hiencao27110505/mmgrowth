@@ -274,7 +274,6 @@ function loadMockData() {
 // ─── Render orchestration ──────────────────────────────────────────────
 function renderAll() {
   renderMetrics();
-  renderDeliverables();
   renderTimeline();
   renderBacklog();
   renderInsights();
@@ -444,67 +443,6 @@ function initCardHTML(r) {
   `;
 }
 
-// ─── Deliverables by objective (stacked bar per objective) ─────────────
-function renderDeliverables() {
-  const container = document.getElementById('deliverables');
-  if (!container) return;
-
-  // Bucket rows by Objective + status category
-  const byObj = {};
-  STATE.rows.forEach(r => {
-    const obj = (r.Objective || '').trim() || 'No objective';
-    if (!byObj[obj]) byObj[obj] = { total: 0, progress: 0, discovery: 0, shipped: 0, blocked: 0, other: 0 };
-    byObj[obj].total++;
-    byObj[obj][statusCategory(r.Status)]++;
-  });
-
-  const entries = Object.entries(byObj).sort((a, b) => b[1].total - a[1].total);
-  if (entries.length === 0) { container.innerHTML = ''; return; }
-
-  const maxTotal = entries[0][1].total;
-  const segOrder = ['progress', 'discovery', 'shipped', 'blocked', 'other'];
-
-  const rowsHTML = entries.map(([objective, c]) => {
-    const segments = segOrder
-      .filter(k => c[k] > 0)
-      .map(k => `<div class="workload-seg seg-${k}" style="flex-grow:${c[k]}" title="${c[k]} ${k}"></div>`)
-      .join('');
-    const widthPct = Math.max(8, (c.total / maxTotal) * 100);
-    return `
-      <div class="workload-row">
-        <div class="workload-name" title="${escapeAttr(objective)}">${escapeHtml(objective)}</div>
-        <div class="workload-bar-wrap">
-          <div class="workload-bar" style="width:${widthPct}%">${segments}</div>
-        </div>
-        <div class="workload-count">${c.total}</div>
-      </div>
-    `;
-  }).join('');
-
-  container.innerHTML = `
-    <div class="workload-section">
-      <div class="workload-head">
-        <h3 class="workload-title">Deliverables by objective</h3>
-        <div class="workload-legend">
-          <span class="legend-item"><span class="legend-dot seg-progress"></span>In progress</span>
-          <span class="legend-item"><span class="legend-dot seg-discovery"></span>Discovery</span>
-          <span class="legend-item"><span class="legend-dot seg-shipped"></span>Shipped</span>
-          <span class="legend-item"><span class="legend-dot seg-blocked"></span>Blocked</span>
-        </div>
-      </div>
-      <div class="workload-list">${rowsHTML}</div>
-    </div>
-  `;
-}
-
-function statusCategory(status) {
-  const s = String(status || '').toLowerCase();
-  if (/ship|done|launch|complete|live/.test(s))         return 'shipped';
-  if (/progress|doing|wip|building|develop/.test(s))     return 'progress';
-  if (/discov|explore|research|backlog|todo|planning/.test(s)) return 'discovery';
-  if (/block|stuck|hold|paus/.test(s))                   return 'blocked';
-  return 'other';
-}
 
 // ─── Card helpers ───────────────────────────────────────────────────────
 function statusPill(status) {

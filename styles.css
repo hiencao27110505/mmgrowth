@@ -188,64 +188,6 @@ a:hover { text-decoration: underline; }
   font-size: 12px; color: var(--ink-3); margin-top: 4px;
 }
 
-/* ─── Workload by owner ──────────────────────────────────────────────── */
-.workload-section {
-  background: var(--white); border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px 18px; margin-bottom: 16px;
-}
-.workload-head {
-  display: flex; align-items: baseline; justify-content: space-between;
-  gap: 16px; flex-wrap: wrap; margin-bottom: 12px;
-}
-.workload-title {
-  font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.5px; color: var(--ink-3); margin: 0;
-}
-.workload-legend {
-  display: flex; gap: 12px; flex-wrap: wrap;
-  font-size: 11px; color: var(--ink-3);
-}
-.legend-item { display: inline-flex; align-items: center; gap: 5px; }
-.legend-dot {
-  display: inline-block; width: 8px; height: 8px; border-radius: 99px;
-}
-
-.workload-list { display: flex; flex-direction: column; gap: 6px; }
-.workload-row {
-  display: grid;
-  grid-template-columns: minmax(160px, 220px) 1fr 28px;
-  gap: 12px; align-items: center;
-}
-.workload-name {
-  font-size: 12px; color: var(--ink-2);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.workload-bar-wrap { width: 100%; }
-.workload-bar {
-  display: flex; height: 12px; border-radius: 99px;
-  background: var(--surface); overflow: hidden;
-  min-width: 12px;
-}
-.workload-seg { height: 100%; transition: opacity 0.12s ease; }
-.workload-seg:hover { opacity: 0.75; }
-.workload-count {
-  font-size: 12px; font-weight: 600; color: var(--ink-2);
-  text-align: right;
-}
-
-/* Status segment colors (also used by legend dots) */
-.seg-progress  { background: var(--blue); }
-.seg-discovery { background: var(--orange); }
-.seg-shipped   { background: var(--green); }
-.seg-blocked   { background: var(--red); }
-.seg-other     { background: var(--ink-3); }
-
-@media (max-width: 680px) {
-  .workload-row { grid-template-columns: 130px 1fr 24px; gap: 8px; }
-  .workload-name { font-size: 11px; }
-}
-
 /* ─── Tabs ────────────────────────────────────────────────────────────── */
 .tabs {
   display: flex; gap: 4px;
