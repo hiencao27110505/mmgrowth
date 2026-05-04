@@ -655,19 +655,47 @@ function closeDetailModal() {
 }
 
 // ─── Submit form (lives in the Backlog tab) ────────────────────────────
-// Quality rules — coaching, not gatekeeping. Submit is allowed even if
-// some checks fail; the PM still triages everything.
-//
-// Rule design follows Amazon's writing standards (working backwards, narrative
-// memos, "data not anecdote", Strunk & White brevity). Each field gets one
-// extra Amazonian check on top of the basic length/topic checks:
-//   - What: no marketing fluff
-//   - Why:  no weasel words
-//   - How:  no corporate jargon
+// Helper: catches lazy/cheating input — repeated character patterns
+// ("ABCABCABC..."), single-char spam ("AAAA"), or single-word filler ("user
+// user user"). Real prose has lexical diversity and no chunk repetition.
+function looksLikeRealText(s, minDistinctWords) {
+  const text = String(s || '').trim();
+  if (text.length === 0) return false;
+  // Reject any 1–5 char chunk that repeats 4+ times in a row.
+  // Catches: "ABCABCABCABC", "lalalala", "aaaaa", "abc abc abc abc".
+  if (/(.{1,5})\1{3,}/i.test(text)) return false;
+  // Reject if a single character makes up >50% of the alphanumeric content.
+  const alnum = text.replace(/[^\p{L}\p{N}]/gu, '');
+  if (alnum.length > 0) {
+    const charCounts = {};
+    for (const ch of alnum.toLowerCase()) charCounts[ch] = (charCounts[ch] || 0) + 1;
+    const topChar = Math.max(...Object.values(charCounts));
+    if (topChar / alnum.length > 0.5) return false;
+  }
+  // Tokenize Unicode letter/digit runs and require N distinct words.
+  const words = text.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
+  const distinct = new Set(words);
+  if (distinct.size < minDistinctWords) return false;
+  // Reject if the same word makes up >35% of all words ("user user user...").
+  if (words.length >= 6) {
+    const wordCounts = {};
+    words.forEach(w => { wordCounts[w] = (wordCounts[w] || 0) + 1; });
+    const topWord = Math.max(...Object.values(wordCounts));
+    if (topWord / words.length > 0.35) return false;
+  }
+  return true;
+}
+
+// Quality rules — coaching + gating. Each field combines:
+//   1. Length / topic basics
+//   2. Amazonian writing principles (no fluff/weasel/jargon)
+//   3. Anti-cheat heuristics (real prose, distinct words, no character spam)
 const QUALITY_CHECKS = {
   what: [
     { label: 'At least 40 characters — specific & complete',
       test: s => s.trim().length >= 40 },
+    { label: 'Reads like a real sentence — 6+ distinct words, no character spam',
+      test: s => looksLikeRealText(s, 6) },
     { label: 'Avoids vague verbs (improve, enhance, optimize, cải thiện…)',
       test: s => s.trim().length > 0 && !/(improve|enhance|optimize|better|nicer|great|cải\s*thiện|tối\s*ưu|nâng\s*cao|tốt\s*hơn)/i.test(s) },
     { label: 'No marketing fluff (amazing, world-class, seamless, magical, đột phá…)',
@@ -676,8 +704,15 @@ const QUALITY_CHECKS = {
   why: [
     { label: 'At least 60 characters — gives context, not a tagline',
       test: s => s.trim().length >= 60 },
-    { label: 'Includes data — number, %, or metric (tickets, NPS, drop-off…)',
-      test: s => /\d/.test(s) || /(\bnps\b|drop[-\s]?off|churn|conversion|retention|tickets|complaints|tỷ\s*lệ|phần\s*trăm)/i.test(s) },
+    { label: 'Reads like a real sentence — 10+ distinct words, no character spam',
+      test: s => looksLikeRealText(s, 10) },
+    { label: 'Includes data — a number tied to a metric (e.g. "30% drop-off", "200 tickets")',
+      test: s => {
+        // Require BOTH a number AND a metric/unit word, OR a quantitative phrase.
+        const hasNumber = /\d/.test(s);
+        const hasMetric = /(\bnps\b|drop[-\s]?off|churn|conversion|retention|tickets?|complaints?|sessions?|signups?|requests?|users?|customers?|orders?|errors?|crashes?|tỷ\s*lệ|phần\s*trăm|người\s*dùng|đơn|lỗi|tickets?)/i.test(s);
+        return hasNumber && hasMetric;
+      } },
     { label: 'Names the user/customer (user, customer, người dùng, khách hàng…)',
       test: s => /(\busers?\b|\bcustomers?\b|người\s*dùng|khách\s*hàng|stakeholder)/i.test(s) },
     { label: 'No weasel words (might, perhaps, we believe, có lẽ, có thể là…) — claim it confidently',
@@ -686,6 +721,8 @@ const QUALITY_CHECKS = {
   how: [
     { label: 'At least 40 characters — concrete approach',
       test: s => s.trim().length >= 40 },
+    { label: 'Reads like a real sentence — 6+ distinct words, no character spam',
+      test: s => looksLikeRealText(s, 6) },
     { label: 'Mentions scope, MVP, or an alternative considered',
       test: s => /(\bmvp\b|\bv1\b|\bv2\b|scope|phase|alternative|instead|trade[-\s]?off|fallback|out\s*of\s*scope|phạm\s*vi|giai\s*đoạn|lựa\s*chọn|thay\s*vì)/i.test(s) },
     { label: 'No corporate jargon (synergy, leverage, ecosystem, holistic, hệ sinh thái…)',
