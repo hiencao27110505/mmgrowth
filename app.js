@@ -18,7 +18,7 @@ const STATE = {
   objectives: [],
   view: 'timeline',
   fetchedAt: 0,
-  timelineGroupBy: 'quarter', // 'quarter' | 'month'
+  timelineGroupBy: 'month', // 'quarter' | 'month'
   synthesis: {
     stakeholder: { text: '', generatedAt: 0 },
     operational: { text: '', generatedAt: 0 }
@@ -453,35 +453,23 @@ function monthLabel(whenStr) {
   return { text: monthNames[p.month - 1] + ' ' + p.year, isNow, isPast };
 }
 
-// ─── Card templates ────────────────────────────────────────────────────
+// ─── Card template (Timeline) ──────────────────────────────────────────
+// Minimal: objective label · title (2-line clamp) · why preview (3-line clamp)
+// · foot row of plain text (status, owner, when). Equal height across all cards.
+// Click → opens detail modal with all the rich info / CTAs / missing-fields chip.
 function initCardHTML(r) {
-  const protoUrl = firstUrl(r.Prototype);
-  const docsUrl  = firstUrl(r['Related Docs']);
-  const horizon  = mapHorizon(r.When);
-  const missing  = missingFields(r);
-  const whyText  = whyPreview(r.Why);
+  const footParts = [];
+  if (r.Status) footParts.push(`<span class="card-status ${statusClass(r.Status)}">${escapeHtml(r.Status)}</span>`);
+  if (r.Who)    footParts.push(`<span class="card-foot-text">${escapeHtml(r.Who)}</span>`);
+  if (r.When)   footParts.push(`<span class="card-foot-text">${escapeHtml(r.When)}</span>`);
+  const foot = footParts.join('<span class="card-foot-sep">·</span>');
 
   return `
-    <div class="init-card horizon-${horizon.toLowerCase()}" data-row='${escapeAttr(JSON.stringify(r))}'>
-      <div class="init-card-header">
-        <div class="init-card-titlebox">
-          ${r.Objective ? `<div class="init-card-objective">${escapeHtml(r.Objective)}</div>` : ''}
-          <div class="init-card-title">${escapeHtml(r.What || '(no title)')}</div>
-        </div>
-        ${statusPill(r.Status)}
-      </div>
-      <div class="init-card-why">${whyText}</div>
-      <div class="init-card-meta">
-        ${ownerChip(r.Who)}
-        ${r.When ? `<span class="meta-when">${escapeHtml(r.When)}</span>` : `<span class="meta-empty">no horizon</span>`}
-        ${missing.length ? `<span class="missing-chip" title="Missing fields: ${escapeAttr(missing.join(', '))}">missing ${escapeHtml(missing.length === 1 ? missing[0] : missing.length + ' fields')}</span>` : ''}
-      </div>
-      ${(protoUrl || docsUrl) ? `
-        <div class="init-card-actions">
-          ${protoUrl ? `<a class="init-card-cta" href="${escapeAttr(protoUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">View prototype ↗</a>` : ''}
-          ${docsUrl  ? `<a class="init-card-cta is-ghost" href="${escapeAttr(docsUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Docs ↗</a>` : ''}
-        </div>
-      ` : ''}
+    <div class="init-card" data-row='${escapeAttr(JSON.stringify(r))}'>
+      ${r.Objective ? `<div class="init-card-objective">${escapeHtml(r.Objective)}</div>` : ''}
+      <div class="init-card-title">${escapeHtml(r.What || '(no title)')}</div>
+      <div class="init-card-why">${whyPreview(r.Why)}</div>
+      <div class="init-card-foot">${foot}</div>
     </div>
   `;
 }

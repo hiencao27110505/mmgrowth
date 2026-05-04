@@ -260,10 +260,6 @@ a:hover { text-decoration: underline; }
   scroll-snap-align: start;
   display: flex; flex-direction: column;
 }
-.timeline-col.is-now {
-  border-color: var(--momo);
-  box-shadow: 0 0 0 1px var(--momo) inset;
-}
 .timeline-col.is-past { opacity: 0.65; }
 
 .timeline-col-head {
@@ -297,83 +293,76 @@ a:hover { text-decoration: underline; }
   display: flex; justify-content: space-between; align-items: center;
 }
 
-/* ─── Initiative card ────────────────────────────────────────────────── */
+/* ─── Initiative card (Timeline) ─────────────────────────────────────── */
 .init-card {
-  background: var(--white); border: 1px solid var(--border);
-  border-left: 3px solid var(--momo);
-  border-radius: var(--radius); padding: 12px 14px;
-  margin-bottom: 10px; cursor: pointer;
-  transition: all 0.15s ease;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  display: flex; flex-direction: column;
+  height: 180px; overflow: hidden;
+  transition: border-color 0.15s ease;
 }
-.init-card:hover {
-  border-color: var(--momo); box-shadow: var(--shadow-sm);
-}
+.init-card:hover { border-color: var(--momo); }
 
-/* Horizon-colored left border so users can scan timeline-vs-later at a glance */
-.horizon-now   { border-left-color: var(--momo); }
-.horizon-next  { border-left-color: var(--orange); }
-.horizon-later { border-left-color: var(--ink-3); }
-
-.init-card-header {
-  display: flex; justify-content: space-between; align-items: flex-start;
-  gap: 10px;
-}
-.init-card-titlebox { flex: 1; min-width: 0; }
 .init-card-objective {
   font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.4px; color: var(--ink-3); margin-bottom: 4px;
+  letter-spacing: 0.4px; color: var(--ink-3);
+  margin-bottom: 6px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .init-card-title {
   font-size: 14px; font-weight: 600; color: var(--ink);
-  margin-bottom: 0; line-height: 1.35;
-  word-break: break-word;
+  line-height: 1.35; margin: 0 0 6px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
 }
+.init-card-why {
+  font-size: 12px; color: var(--ink-3); line-height: 1.5;
+  flex: 1; margin: 0 0 8px;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.why-empty { font-style: italic; opacity: 0.55; }
 
-/* Why preview — most insightful field, shown collapsed on the card front */
-.init-card-why, .detail-why {
-  font-size: 12.5px; color: var(--ink-3); line-height: 1.5;
-  margin-top: 6px;
+.init-card-foot {
+  display: flex; gap: 6px; align-items: center; flex-shrink: 0;
+  font-size: 11px; color: var(--ink-3);
+  white-space: nowrap; overflow: hidden;
 }
-.detail-why { font-size: 13px; }
-.why-empty { font-style: italic; opacity: 0.6; }
+.card-status {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.3px;
+  color: var(--ink-3);
+}
+.card-status.is-shipped  { color: var(--green); }
+.card-status.is-progress { color: var(--blue); }
+.card-status.is-discovery{ color: var(--orange); }
+.card-status.is-blocked  { color: var(--red); }
+.card-foot-text { color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; }
+.card-foot-sep  { color: var(--ink-3); opacity: 0.4; }
 
-.init-card-meta {
-  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
-  font-size: 11px; color: var(--ink-3); margin-top: 10px;
-}
+/* Detail-card variants (used in modal) keep their own .detail-why/.meta-empty rules below */
+.detail-why { font-size: 13px; color: var(--ink-3); line-height: 1.5; margin-top: 6px; }
 .meta-empty { color: var(--ink-3); font-style: italic; opacity: 0.7; }
 .meta-when {
   display: inline-block; font-size: 11px; font-weight: 500;
   padding: 2px 7px; background: var(--surface); border-radius: 99px;
   color: var(--ink-2);
 }
-
-/* Owner chip — visual label */
 .owner-chip, .owner-chip-static {
   display: inline-block; font-size: 11px; font-weight: 500;
   padding: 2px 8px; border-radius: 99px;
   background: var(--white); border: 1px solid var(--border);
   color: var(--ink-2);
 }
-
-/* Missing-fields warning chip — calls out cards needing PM attention */
 .missing-chip {
   display: inline-block; font-size: 10px; font-weight: 600;
   padding: 2px 7px; border-radius: 3px;
   background: #fff8f0; border: 1px solid var(--orange); color: var(--orange);
-  text-transform: lowercase;
-  cursor: help;
-}
-
-/* Card actions row (prototype + docs) */
-.init-card-actions {
-  display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px;
-}
-.init-card-cta.is-ghost {
-  border-color: var(--border); color: var(--ink-2); background: var(--white);
-}
-.init-card-cta.is-ghost:hover {
-  background: var(--surface); border-color: var(--ink-3); color: var(--ink);
+  text-transform: lowercase; cursor: help;
 }
 
 .init-card-cta {
