@@ -689,6 +689,20 @@ a:hover { text-decoration: underline; }
 }
 .form-meta-inline strong { color: var(--ink-2); }
 
+/* Validation error state — applied to inputs/textareas/selects on submit attempt */
+.field input.has-error,
+.field select.has-error,
+.field textarea.has-error {
+  border-color: var(--red);
+  box-shadow: 0 0 0 2px rgba(192, 57, 43, 0.12);
+}
+.quality-list.show-failed li:not(.is-passed) {
+  color: var(--red);
+}
+.quality-list.show-failed li:not(.is-passed) .check-icon {
+  color: var(--red); opacity: 1;
+}
+
 /* Submission list head */
 .backlog-list-head {
   display: flex; align-items: baseline; justify-content: space-between;

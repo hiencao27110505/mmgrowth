@@ -31,6 +31,9 @@ const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const SYNTH_CACHE_KEY    = 'roadmap_synthesis_v1';
 const SYNTH_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour client-side
 
+// Only these emails can see/use the AI Insights tab. Server-side enforced too.
+const INSIGHTS_ALLOWED = ['hien.cao1@mservice.com.vn'];
+
 // ─── Boot ───────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   loadCachedSynthesis();
@@ -57,6 +60,13 @@ function showApp(email) {
   document.getElementById('app').hidden = false;
   document.getElementById('viewerChip').textContent = email;
   document.getElementById('submitterEmail').textContent = email;
+
+  // Hide AI Insights tab for non-allowlisted users. Backend also enforces this.
+  const insightsAllowed = INSIGHTS_ALLOWED.map(s => s.toLowerCase()).includes((email || '').toLowerCase());
+  const insightsTab = document.querySelector('[data-view="insights"]');
+  if (insightsTab) insightsTab.hidden = !insightsAllowed;
+  // If the user is somehow on the insights view but not allowed, fall back to timeline
+  if (!insightsAllowed && STATE.view === 'insights') switchView('timeline');
 }
 
 function showGateError(msg) {
@@ -119,10 +129,14 @@ function bindUI() {
   });
   renderChecklists();
 
-  // Objective dropdown — show "Other" input when chosen
+  // Objective dropdown — show "Other" input when chosen + re-evaluate submit gate
   document.getElementById('fObjective').addEventListener('change', (e) => {
     document.getElementById('fObjectiveOtherWrap').hidden = e.target.value !== '__other__';
+    updateSubmitGate();
   });
+  // "Other (specify)" text input also gates the submit
+  const fOther = document.getElementById('fObjectiveOther');
+  if (fOther) fOther.addEventListener('input', updateSubmitGate);
 
   // Detail modal close
   document.querySelectorAll('[data-detail-close]').forEach(el => {
@@ -681,10 +695,11 @@ const QUALITY_CHECKS = {
 
 function renderChecklists() {
   ['what', 'why', 'how'].forEach(field => {
-    const inputId = 'f' + field.charAt(0).toUpperCase() + field.slice(1);
-    const container = document.getElementById('check' + field.charAt(0).toUpperCase() + field.slice(1));
+    const cap = field.charAt(0).toUpperCase() + field.slice(1);
+    const input = document.getElementById('f' + cap);
+    const container = document.getElementById('check' + cap);
     if (!container) return;
-    const value = (document.getElementById(inputId) || {}).value || '';
+    const value = (input || {}).value || '';
     const items = QUALITY_CHECKS[field].map(c => {
       const passed = c.test(value);
       return `<li class="${passed ? 'is-passed' : ''}">
@@ -693,7 +708,70 @@ function renderChecklists() {
       </li>`;
     }).join('');
     container.innerHTML = items;
+
+    // If the user has fixed all checks for this field, clear its error highlight
+    const allPass = QUALITY_CHECKS[field].every(c => c.test(value));
+    if (input && allPass) {
+      input.classList.remove('has-error');
+      container.classList.remove('show-failed');
+    }
   });
+
+  // Objective field also clears its highlight when satisfied
+  const objSel = document.getElementById('fObjective');
+  const objOther = document.getElementById('fObjectiveOther');
+  const objectiveOK = (objSel.value && objSel.value !== '__other__')
+                  || (objSel.value === '__other__' && (objOther || {}).value && objOther.value.trim());
+  if (objectiveOK) {
+    objSel.classList.remove('has-error');
+    if (objOther) objOther.classList.remove('has-error');
+  }
+}
+
+// Returns set of field keys that fail validation. Used by handleSubmit.
+function collectFailingFields() {
+  const failing = new Set();
+  ['what', 'why', 'how'].forEach(field => {
+    const cap = field.charAt(0).toUpperCase() + field.slice(1);
+    const value = (document.getElementById('f' + cap) || {}).value || '';
+    if (!QUALITY_CHECKS[field].every(c => c.test(value))) failing.add(field);
+  });
+  const objVal = document.getElementById('fObjective').value;
+  const otherVal = (document.getElementById('fObjectiveOther') || {}).value || '';
+  const objectiveOK = (objVal && objVal !== '__other__')
+                  || (objVal === '__other__' && otherVal.trim());
+  if (!objectiveOK) failing.add('objective');
+  return failing;
+}
+
+function highlightFailingFields(failing) {
+  ['what', 'why', 'how'].forEach(field => {
+    const cap = field.charAt(0).toUpperCase() + field.slice(1);
+    const input = document.getElementById('f' + cap);
+    const checklist = document.getElementById('check' + cap);
+    if (failing.has(field)) {
+      input && input.classList.add('has-error');
+      checklist && checklist.classList.add('show-failed');
+    }
+  });
+  if (failing.has('objective')) {
+    document.getElementById('fObjective').classList.add('has-error');
+    const other = document.getElementById('fObjectiveOther');
+    if (other && document.getElementById('fObjective').value === '__other__') {
+      other.classList.add('has-error');
+    }
+  }
+}
+
+function scrollToFirstFailing(failing) {
+  const order = ['objective', 'what', 'why', 'how'];
+  const first = order.find(f => failing.has(f));
+  if (!first) return;
+  const id = first === 'objective' ? 'fObjective' : 'f' + first.charAt(0).toUpperCase() + first.slice(1);
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => el.focus({ preventScroll: true }), 350);
 }
 
 function resetSubmitForm() {
@@ -713,12 +791,20 @@ function populateObjectiveDropdown() {
 
 async function handleSubmit(e) {
   e.preventDefault();
+
+  // Quality validation — block submit if any rule fails, highlight what's wrong
+  const failing = collectFailingFields();
+  if (failing.size > 0) {
+    highlightFailingFields(failing);
+    showFormError('Please address the highlighted requirements before submitting.');
+    scrollToFirstFailing(failing);
+    return;
+  }
+
   const objSel = document.getElementById('fObjective').value;
   const objOther = document.getElementById('fObjectiveOther').value.trim();
   const isNew = objSel === '__other__';
   const objective = isNew ? objOther : objSel;
-
-  if (!objective) return showFormError('Please select or enter an objective.');
 
   const body = {
     token: AUTH.getToken() || 'mock-token',
