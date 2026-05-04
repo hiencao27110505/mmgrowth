@@ -657,8 +657,27 @@ a:hover { text-decoration: underline; }
   margin: 0;
 }
 
-.backlog-form .field { margin-bottom: 12px; }
+.backlog-form .field { margin-bottom: 16px; }
 .backlog-form .field-label { margin-bottom: 4px; }
+
+/* Quality checklist beneath each textarea */
+.quality-list {
+  list-style: none; padding: 0; margin: 6px 0 0;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.quality-list li {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 11.5px; line-height: 1.45;
+  color: var(--ink-3);
+  transition: color 0.15s ease;
+}
+.quality-list li.is-passed { color: var(--green); }
+.quality-list .check-icon {
+  flex-shrink: 0; width: 14px; text-align: center;
+  font-weight: 700; font-size: 12px;
+}
+.quality-list li.is-passed .check-icon { color: var(--green); }
+.quality-list li:not(.is-passed) .check-icon { color: var(--ink-3); opacity: 0.55; }
 
 .backlog-form-foot {
   display: flex; align-items: center; justify-content: space-between;

@@ -112,6 +112,13 @@ function bindUI() {
   // Form submit
   document.getElementById('submitForm').addEventListener('submit', handleSubmit);
 
+  // Live quality checklist updates
+  ['fWhat', 'fWhy', 'fHow'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', renderChecklists);
+  });
+  renderChecklists();
+
   // Objective dropdown — show "Other" input when chosen
   document.getElementById('fObjective').addEventListener('change', (e) => {
     document.getElementById('fObjectiveOtherWrap').hidden = e.target.value !== '__other__';
@@ -634,10 +641,53 @@ function closeDetailModal() {
 }
 
 // ─── Submit form (lives in the Backlog tab) ────────────────────────────
+// Quality rules — coaching, not gatekeeping. Submit is allowed even if
+// some checks fail; the PM still triages everything.
+const QUALITY_CHECKS = {
+  what: [
+    { label: 'At least 40 characters — specific & complete',
+      test: s => s.trim().length >= 40 },
+    { label: 'Avoids vague verbs (improve, enhance, optimize, cải thiện…)',
+      test: s => s.trim().length > 0 && !/(improve|enhance|optimize|better|nicer|great|cải\s*thiện|tối\s*ưu|nâng\s*cao|tốt\s*hơn)/i.test(s) }
+  ],
+  why: [
+    { label: 'At least 60 characters — gives context, not a tagline',
+      test: s => s.trim().length >= 60 },
+    { label: 'Includes data — number, %, or metric (tickets, NPS, drop-off…)',
+      test: s => /\d/.test(s) || /(\bnps\b|drop[-\s]?off|churn|conversion|retention|tickets|complaints|tỷ\s*lệ|phần\s*trăm)/i.test(s) },
+    { label: 'Names the user/customer (user, customer, người dùng, khách hàng…)',
+      test: s => /(\busers?\b|\bcustomers?\b|người\s*dùng|khách\s*hàng|stakeholder)/i.test(s) }
+  ],
+  how: [
+    { label: 'At least 40 characters — concrete approach',
+      test: s => s.trim().length >= 40 },
+    { label: 'Mentions scope, MVP, or an alternative considered',
+      test: s => /(\bmvp\b|\bv1\b|\bv2\b|scope|phase|alternative|instead|trade[-\s]?off|fallback|out\s*of\s*scope|phạm\s*vi|giai\s*đoạn|lựa\s*chọn|thay\s*vì)/i.test(s) }
+  ]
+};
+
+function renderChecklists() {
+  ['what', 'why', 'how'].forEach(field => {
+    const inputId = 'f' + field.charAt(0).toUpperCase() + field.slice(1);
+    const container = document.getElementById('check' + field.charAt(0).toUpperCase() + field.slice(1));
+    if (!container) return;
+    const value = (document.getElementById(inputId) || {}).value || '';
+    const items = QUALITY_CHECKS[field].map(c => {
+      const passed = c.test(value);
+      return `<li class="${passed ? 'is-passed' : ''}">
+        <span class="check-icon" aria-hidden="true">${passed ? '✓' : '○'}</span>
+        <span class="check-label">${escapeHtml(c.label)}</span>
+      </li>`;
+    }).join('');
+    container.innerHTML = items;
+  });
+}
+
 function resetSubmitForm() {
   document.getElementById('submitForm').reset();
   document.getElementById('fObjectiveOtherWrap').hidden = true;
   document.getElementById('formError').hidden = true;
+  renderChecklists(); // re-render so all items go back to unchecked
 }
 
 function populateObjectiveDropdown() {

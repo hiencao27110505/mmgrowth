@@ -78,16 +78,19 @@
             <label class="field">
               <span class="field-label">What <span class="req">*</span></span>
               <textarea id="fWhat" rows="2" required placeholder="What's the proposed initiative?"></textarea>
+              <ul class="quality-list" id="checkWhat"></ul>
             </label>
 
             <label class="field">
               <span class="field-label">Why <span class="req">*</span></span>
-              <textarea id="fWhy" rows="2" required placeholder="What problem does it solve? Who benefits?"></textarea>
+              <textarea id="fWhy" rows="2" required placeholder="What problem does it solve? Who benefits? Include data."></textarea>
+              <ul class="quality-list" id="checkWhy"></ul>
             </label>
 
             <label class="field">
               <span class="field-label">How <span class="req">*</span></span>
-              <textarea id="fHow" rows="2" required placeholder="Suggested approach or solution direction."></textarea>
+              <textarea id="fHow" rows="2" required placeholder="Suggested approach. Mention MVP scope or alternatives."></textarea>
+              <ul class="quality-list" id="checkHow"></ul>
             </label>
 
             <div id="formError" class="form-error" hidden></div>
