@@ -778,7 +778,27 @@ function resetSubmitForm() {
   document.getElementById('submitForm').reset();
   document.getElementById('fObjectiveOtherWrap').hidden = true;
   document.getElementById('formError').hidden = true;
+  // Clear any error highlights from a prior failed attempt
+  document.querySelectorAll('.has-error').forEach(el => el.classList.remove('has-error'));
+  document.querySelectorAll('.quality-list.show-failed').forEach(el => el.classList.remove('show-failed'));
   renderChecklists(); // re-render so all items go back to unchecked
+}
+
+// Confetti celebration on successful submit. MoMo brand colors. Fires three
+// staggered bursts so it feels generous, not stingy. No-op if the library
+// hasn't loaded (e.g., offline) — never blocks submission.
+function celebrateSubmit() {
+  if (typeof confetti !== 'function') return;
+  const colors = ['#ae2070', '#faf2f6', '#d35400', '#1a7a4a', '#2266aa', '#ffffff'];
+  const base = { ticks: 120, gravity: 0.85, decay: 0.94, startVelocity: 45, scalar: 1.05, colors };
+
+  // Center burst — big and showy
+  confetti({ ...base, particleCount: 120, spread: 90, origin: { x: 0.5, y: 0.65 } });
+  // Side bursts — fountain in from left then right
+  setTimeout(() => confetti({ ...base, particleCount: 70, angle: 60,  spread: 70, origin: { x: 0,   y: 0.7 } }), 180);
+  setTimeout(() => confetti({ ...base, particleCount: 70, angle: 120, spread: 70, origin: { x: 1,   y: 0.7 } }), 360);
+  // Top sprinkle for a final flourish
+  setTimeout(() => confetti({ ...base, particleCount: 80, spread: 160, startVelocity: 25, origin: { x: 0.5, y: 0.2 } }), 540);
 }
 
 function populateObjectiveDropdown() {
@@ -818,6 +838,7 @@ async function handleSubmit(e) {
   if (CONFIG.USE_MOCK) {
     console.log('[MOCK] Would POST:', body);
     resetSubmitForm();
+    celebrateSubmit();
     toast('Mock submit: row would be appended to Backlog');
     return;
   }
@@ -828,6 +849,7 @@ async function handleSubmit(e) {
     const data = await jsonpCall({ action: 'submit', ...body });
     if (!data.ok) throw new Error(data.error || 'submit failed');
     resetSubmitForm();
+    celebrateSubmit();
     toast(`Idea submitted (row #${data.rowNumber} in Backlog tab). Thanks!`);
     fetchData(true); // force-refresh so the new backlog row appears immediately
   } catch (err) {
