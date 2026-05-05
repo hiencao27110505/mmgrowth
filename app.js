@@ -296,6 +296,7 @@ function loadMockData() {
 function renderAll() {
   renderMetrics();
   renderTimeline();
+  renderPIC();
   renderBacklog();
   renderInsights();
 }
@@ -306,6 +307,7 @@ function switchView(view) {
     t.classList.toggle('is-active', t.dataset.view === view);
   });
   document.getElementById('view-timeline').hidden  = view !== 'timeline';
+  document.getElementById('view-pic').hidden       = view !== 'pic';
   document.getElementById('view-backlog').hidden   = view !== 'backlog';
   document.getElementById('view-insights').hidden  = view !== 'insights';
 }

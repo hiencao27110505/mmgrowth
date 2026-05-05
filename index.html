@@ -45,6 +45,7 @@
       <!-- View switcher -->
       <nav class="tabs">
         <button class="tab is-active" data-view="timeline">Timeline</button>
+        <button class="tab" data-view="pic">PIC <span id="pic-count" class="tab-count">0</span></button>
         <button class="tab" data-view="backlog">Backlog <span id="backlog-count" class="tab-count">0</span></button>
         <button class="tab" data-view="insights">AI Insights</button>
       </nav>
@@ -53,12 +54,15 @@
       <section id="view-timeline" class="view">
         <div id="timelineColumns" class="timeline"></div>
       </section>
+      <section id="view-pic" class="view" hidden>
+        <div id="picColumns" class="timeline"></div>
+      </section>
       <section id="view-backlog"  class="view" hidden>
         <div class="backlog-form-wrapper">
         <div class="backlog-form-card">
           <div class="backlog-form-head">
             <h2 class="backlog-form-title">Submit an idea</h2>
-            <p class="backlog-form-sub">Propose a new initiative for this team's roadmap. Goes into the Backlog tab below for the PM to triage.</p>
+            <p class="backlog-form-sub">Propose a new initiative for this team's roadmap. Goes into the Backlog tab below.</p>
           </div>
 
           <form id="submitForm" class="form backlog-form">
