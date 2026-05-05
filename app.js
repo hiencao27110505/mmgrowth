@@ -379,6 +379,86 @@ function renderTimeline() {
   bindCardClicks(document.getElementById('timelineColumns'));
 }
 
+// ─── PIC view (grouped by Owner → then by Month) ───────────────────────
+// Same column layout as Timeline, but each column is a person and cards
+// inside each column are sub-grouped by ETA month so workload is visible.
+function renderPIC() {
+  // Group rows by owner
+  const owners = {};
+  STATE.rows.forEach(r => {
+    const who = (r.Who || '').trim() || '— No owner';
+    if (!owners[who]) owners[who] = [];
+    owners[who].push(r);
+  });
+
+  // Update tab count = distinct owners (excluding the no-owner bucket)
+  const ownerCount = Object.keys(owners).filter(k => k !== '— No owner').length;
+  const countEl = document.getElementById('pic-count');
+  if (countEl) countEl.textContent = ownerCount;
+
+  // Sort owners: most-loaded first (so overloaded folks pop), tiebreak alpha,
+  // unowned bucket always last.
+  const ownerKeys = Object.keys(owners).sort((a, b) => {
+    if (a === '— No owner') return 1;
+    if (b === '— No owner') return -1;
+    const diff = owners[b].length - owners[a].length;
+    return diff !== 0 ? diff : a.localeCompare(b);
+  });
+
+  const container = document.getElementById('picColumns');
+  if (!container) return;
+
+  if (ownerKeys.length === 0) {
+    container.innerHTML = '<div class="empty-state">No initiatives in the sheet yet.</div>';
+    return;
+  }
+
+  container.innerHTML = ownerKeys.map(owner => {
+    const rows = owners[owner];
+
+    // Sub-group this owner's rows by month
+    const months = {};
+    rows.forEach(r => {
+      const key = monthKey(r.When);
+      if (!months[key]) months[key] = { label: monthLabel(r.When), rows: [] };
+      months[key].rows.push(r);
+    });
+    const sortedMonths = Object.keys(months).sort((a, b) => {
+      if (a === 'unscheduled') return 1;
+      if (b === 'unscheduled') return -1;
+      return a.localeCompare(b);
+    });
+
+    return `
+      <div class="timeline-col">
+        <div class="timeline-col-head">
+          <span class="timeline-col-label">${escapeHtml(owner)}</span>
+          <span class="timeline-col-count">${rows.length}</span>
+        </div>
+        ${sortedMonths.map(mk => {
+          const m = months[mk];
+          const cls = [
+            m.label.isNow  ? 'is-now'  : '',
+            m.label.isPast ? 'is-past' : ''
+          ].filter(Boolean).join(' ');
+          const suffix = m.label.isNow ? ' · Now' : '';
+          return `
+            <div class="pic-month-group ${cls}">
+              <div class="pic-month-head">
+                <span class="pic-month-label">${escapeHtml(m.label.text)}${suffix}</span>
+                <span class="pic-month-count">${m.rows.length}</span>
+              </div>
+              ${m.rows.map(initCardHTML).join('')}
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }).join('');
+
+  bindCardClicks(container);
+}
+
 // Backwards-compat shim: initCardHTML still uses mapHorizon for the
 // horizon-colored left border. Keep it as a thin wrapper around quarter/horizon.
 function mapHorizon(whenStr) {
