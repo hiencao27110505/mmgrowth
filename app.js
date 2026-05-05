@@ -35,6 +35,9 @@ const SYNTH_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour client-side
 // Only these emails can see/use the AI Insights tab. Server-side enforced too.
 const INSIGHTS_ALLOWED = ['hien.cao1@mservice.com.vn'];
 
+// Only these emails can edit cards inline (action=update). Server-side enforced too.
+const EDITORS_ALLOWED = ['hien.cao1@mservice.com.vn'];
+
 // ─── Boot ───────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   loadCachedSynthesis();
@@ -142,10 +145,18 @@ function bindUI() {
   // (Timeline filter listeners attached inside populateTimelineFilters —
   // they need to survive each rebuild of the <select> options.)
 
-  // Detail modal close
-  document.querySelectorAll('[data-detail-close]').forEach(el => {
-    el.addEventListener('click', closeDetailModal);
-  });
+  // Detail modal close — delegated, so the listener is robust against
+  // re-renders and works for any element under the modal carrying the
+  // [data-detail-close] hook (backdrop, X button, future cancel links).
+  const detailModalEl = document.getElementById('detailModal');
+  if (detailModalEl) {
+    detailModalEl.addEventListener('click', (e) => {
+      if (e.target.closest('[data-detail-close]')) {
+        e.preventDefault();
+        closeDetailModal();
+      }
+    });
+  }
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !document.getElementById('detailModal').hidden) {
       closeDetailModal();
@@ -499,22 +510,6 @@ function renderTimeline() {
   bindCardClicks(document.getElementById('timelineColumns'));
 }
 
-// Backwards-compat shim: initCardHTML still uses mapHorizon for the
-// horizon-colored left border. Keep it as a thin wrapper around quarter/horizon.
-function mapHorizon(whenStr) {
-  const p = parseWhenToMonth(whenStr);
-  if (!p) return 'Later';
-  const today = new Date();
-  const curY = today.getFullYear();
-  const curQ = Math.floor(today.getMonth() / 3) + 1;
-  const nextQ = curQ === 4 ? 1 : curQ + 1;
-  const nextY = curQ === 4 ? curY + 1 : curY;
-  const q = Math.floor((p.month - 1) / 3) + 1;
-  if (p.year === curY  && q === curQ)  return 'Now';
-  if (p.year === nextY && q === nextQ) return 'Next';
-  return 'Later';
-}
-
 // ─── Month grouping helpers ─────────────────────────────────────────────
 function parseWhenToMonth(whenStr) {
   const s = String(whenStr || '').trim();
@@ -743,38 +738,288 @@ function bindCardClicks(scope) {
 }
 
 // ─── Detail modal (initiative) ──────────────────────────────────────────
+// Stakeholders see this when they click any card in Timeline. For sheet rows
+// (What&Why) it's an editable form with a single Save at the bottom; for
+// backlog rows (`_isBacklog`) it falls back to a read-only summary.
+
+const MONTH_NAMES_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const STATUS_OPTIONS    = ['Discovery','Doing','In review','Blocked','Shipped'];
+// Track open card so the Save handler can diff against it
+let CURRENT_DETAIL_ROW = null;
+
+function isEditorViewer() {
+  const viewerEmail = (AUTH.getEmail() || '').toLowerCase();
+  return EDITORS_ALLOWED.map(s => s.toLowerCase()).includes(viewerEmail);
+}
+
 function openDetailModal(r) {
+  CURRENT_DETAIL_ROW = r;
   const protoUrl = firstUrl(r.Prototype);
-  const horizon  = mapHorizon(r.When);
-  const missing  = missingFields(r);
+  const isBacklog = !!r._isBacklog;
+  const canEdit = !isBacklog && isEditorViewer();
 
   document.getElementById('detailModalTitle').textContent = r.What || '(no title)';
-  document.getElementById('detailModalBody').innerHTML = `
-    <div class="detail-modal-meta horizon-${horizon.toLowerCase()}">
+  document.getElementById('detailModalBody').innerHTML = canEdit
+    ? renderDetailEditable(r, protoUrl)
+    : renderDetailReadonly(r, protoUrl);
+
+  document.getElementById('detailModal').hidden = false;
+  document.body.style.overflow = 'hidden';
+
+  if (canEdit) wireDetailEditHandlers();
+}
+
+function closeDetailModal() {
+  document.getElementById('detailModal').hidden = true;
+  document.body.style.overflow = '';
+  CURRENT_DETAIL_ROW = null;
+}
+
+// Read-only view — used for backlog cards surfaced in the unscheduled column.
+function renderDetailReadonly(r, protoUrl) {
+  return `
+    <div class="detail-modal-meta">
       ${r.Objective ? `<div class="detail-objective">${escapeHtml(r.Objective)}</div>` : ''}
       <div class="detail-modal-chips">
         ${statusPill(r.Status)}
         ${r.Who  ? `<span class="owner-chip-static">${escapeHtml(r.Who)}</span>`  : `<span class="meta-empty">no owner</span>`}
         ${r.When ? `<span class="meta-when">${escapeHtml(r.When)}</span>`         : `<span class="meta-empty">no horizon</span>`}
-        ${missing.length ? `<span class="missing-chip" title="Missing: ${escapeAttr(missing.join(', '))}">missing ${escapeHtml(missing.length === 1 ? missing[0] : missing.length + ' fields')}</span>` : ''}
+        <span class="meta-empty">backlog · read-only here</span>
       </div>
       ${protoUrl ? `<a class="btn btn-primary detail-modal-cta" href="${escapeAttr(protoUrl)}" target="_blank" rel="noopener">View prototype ↗</a>` : ''}
     </div>
     <div class="detail-modal-content">
       ${fieldOrPlaceholder('Why', r.Why)}
       ${fieldOrPlaceholder('How', r.How)}
-      ${fieldOrPlaceholder('User flow', r['User Flow'])}
-      ${linkSectionOrPlaceholder('Prototype', r.Prototype)}
-      ${linkSectionOrPlaceholder('Related docs', r['Related Docs'])}
     </div>
   `;
-  document.getElementById('detailModal').hidden = false;
-  document.body.style.overflow = 'hidden';
 }
 
-function closeDetailModal() {
-  document.getElementById('detailModal').hidden = true;
-  document.body.style.overflow = '';
+// Editable form for sheet rows. Each field is rendered as the right input
+// type. A single Save button at the bottom commits whatever changed.
+function renderDetailEditable(r, protoUrl) {
+  const objectiveOpts = STATE.objectives.map(o =>
+    `<option value="${escapeAttr(o)}"${o === (r.Objective || '').trim() ? ' selected' : ''}>${escapeHtml(o)}</option>`
+  ).join('');
+  const statusSet = new Set([
+    ...STATUS_OPTIONS,
+    ...STATE.rows.map(x => (x.Status || '').trim()).filter(Boolean)
+  ]);
+  if (r.Status) statusSet.add(r.Status.trim());
+  const statusOpts = ['', ...Array.from(statusSet)]
+    .map(s => `<option value="${escapeAttr(s)}"${s === (r.Status || '').trim() ? ' selected' : ''}>${s ? escapeHtml(s) : '— no status —'}</option>`)
+    .join('');
+
+  // When → split current value into month + year for the two selects
+  const parsed = parseWhenToMonth(r.When);
+  const curYear  = parsed ? parsed.year  : '';
+  const curMonth = parsed ? parsed.month : '';
+  const today = new Date();
+  const yearStart = today.getFullYear() - 1;
+  const yearEnd   = today.getFullYear() + 2;
+  const yearOpts = [''].concat(
+    Array.from({ length: yearEnd - yearStart + 1 }, (_, i) => yearStart + i)
+  ).map(y => `<option value="${y}"${String(y) === String(curYear) ? ' selected' : ''}>${y === '' ? '— year —' : y}</option>`).join('');
+  const monthOpts = [''].concat(MONTH_NAMES_SHORT.map((m, i) => ({ name: m, num: i + 1 })))
+    .map(opt => {
+      if (opt === '') return `<option value="">— month —</option>`;
+      return `<option value="${opt.num}"${String(opt.num) === String(curMonth) ? ' selected' : ''}>${opt.name}</option>`;
+    }).join('');
+
+  // Datalist for owner — autocompletes from existing names without forcing
+  // the user into a fixed enum (frees-form names like "Hân + Linh" still work)
+  const ownerSet = new Set(STATE.rows.map(x => (x.Who || '').trim()).filter(Boolean));
+  const ownerListOpts = Array.from(ownerSet).sort((a,b) => a.localeCompare(b))
+    .map(o => `<option value="${escapeAttr(o)}"></option>`).join('');
+
+  return `
+    <form id="detailEditForm" class="detail-edit-form" data-row-key="${escapeAttr(r['#'] || '')}">
+      <div class="form-grid-2">
+        <label class="field">
+          <span class="field-label">Objective</span>
+          <select name="Objective">
+            <option value="">— Select —</option>
+            ${objectiveOpts}
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">Status</span>
+          <select name="Status">${statusOpts}</select>
+        </label>
+      </div>
+
+      <label class="field">
+        <span class="field-label">What</span>
+        <textarea name="What" rows="2">${escapeHtml(r.What || '')}</textarea>
+      </label>
+
+      <label class="field">
+        <span class="field-label">Why</span>
+        <textarea name="Why" rows="3">${escapeHtml(r.Why || '')}</textarea>
+      </label>
+
+      <label class="field">
+        <span class="field-label">How</span>
+        <textarea name="How" rows="3">${escapeHtml(r.How || '')}</textarea>
+      </label>
+
+      <label class="field">
+        <span class="field-label">User flow</span>
+        <textarea name="User Flow" rows="2">${escapeHtml(r['User Flow'] || '')}</textarea>
+      </label>
+
+      <div class="form-grid-2">
+        <label class="field">
+          <span class="field-label">Owner</span>
+          <input name="Who" type="text" list="ownerSuggestions" value="${escapeAttr(r.Who || '')}" placeholder="e.g. Hân" />
+          <datalist id="ownerSuggestions">${ownerListOpts}</datalist>
+        </label>
+        <div class="field">
+          <span class="field-label">When (ETA)</span>
+          <div class="when-pair">
+            <select name="WhenMonth">${monthOpts}</select>
+            <select name="WhenYear">${yearOpts}</select>
+          </div>
+        </div>
+      </div>
+
+      <label class="field">
+        <span class="field-label">Prototype URL</span>
+        <input name="Prototype" type="url" value="${escapeAttr(r.Prototype || '')}" placeholder="https://…" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">Related docs</span>
+        <input name="Related Docs" type="text" value="${escapeAttr(r['Related Docs'] || '')}" placeholder="One or more URLs, comma-separated" />
+      </label>
+
+      <div id="detailEditError" class="form-error" hidden></div>
+
+      <div class="detail-edit-foot">
+        <span class="detail-edit-meta" id="detailEditDirty">No changes yet</span>
+        <div class="detail-edit-actions">
+          <button type="button" class="btn btn-link" data-detail-close>Cancel</button>
+          <button type="submit" class="btn btn-primary" id="detailSaveBtn" disabled>Save changes</button>
+        </div>
+      </div>
+    </form>
+  `;
+}
+
+// Wire dirty tracking + submit handler each time the form is rendered.
+function wireDetailEditHandlers() {
+  const form = document.getElementById('detailEditForm');
+  if (!form) return;
+  const saveBtn = document.getElementById('detailSaveBtn');
+  const meta    = document.getElementById('detailEditDirty');
+
+  // Re-evaluate dirty state on any input/change
+  function refreshDirty() {
+    const changes = collectDetailChanges();
+    const n = Object.keys(changes).length;
+    saveBtn.disabled = n === 0;
+    meta.textContent = n === 0
+      ? 'No changes yet'
+      : `${n} change${n > 1 ? 's' : ''} pending`;
+  }
+  form.addEventListener('input', refreshDirty);
+  form.addEventListener('change', refreshDirty);
+
+  form.addEventListener('submit', handleDetailSave);
+  refreshDirty();
+}
+
+// Diff the form against CURRENT_DETAIL_ROW. Returns { fieldName: newValue }
+// for fields that changed. Empty object = no changes.
+function collectDetailChanges() {
+  const r = CURRENT_DETAIL_ROW;
+  if (!r) return {};
+  const form = document.getElementById('detailEditForm');
+  if (!form) return {};
+  const fd = new FormData(form);
+  const changes = {};
+
+  ['Objective','Status','What','Why','How','User Flow','Who','Prototype','Related Docs'].forEach(name => {
+    const newVal = (fd.get(name) || '').toString().trim();
+    const oldVal = ((r[name] || '') + '').trim();
+    if (newVal !== oldVal) changes[name] = newVal;
+  });
+
+  // When: combine month + year selects → "MMM YYYY" or empty if cleared
+  const m = (fd.get('WhenMonth') || '').toString();
+  const y = (fd.get('WhenYear')  || '').toString();
+  let newWhen = '';
+  if (m && y) newWhen = `${MONTH_NAMES_SHORT[parseInt(m, 10) - 1]} ${y}`;
+  const oldWhen = ((r.When || '') + '').trim();
+  if (newWhen !== oldWhen) changes['When'] = newWhen;
+
+  return changes;
+}
+
+async function handleDetailSave(e) {
+  e.preventDefault();
+  const r = CURRENT_DETAIL_ROW;
+  if (!r) return;
+
+  const changes = collectDetailChanges();
+  if (Object.keys(changes).length === 0) return;
+
+  // Cross-field validation: When requires both month AND year, or both empty
+  const form = document.getElementById('detailEditForm');
+  const fd = new FormData(form);
+  const m = (fd.get('WhenMonth') || '').toString();
+  const y = (fd.get('WhenYear')  || '').toString();
+  if ((m && !y) || (!m && y)) {
+    showDetailEditError('Pick both month and year, or leave both empty.');
+    return;
+  }
+
+  const rowKey = r['#'];
+  if (!rowKey) {
+    showDetailEditError('This row has no "#" key — cannot update. Check the sheet.');
+    return;
+  }
+
+  const btn = document.getElementById('detailSaveBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  try {
+    const data = await jsonpCall({
+      action: 'update',
+      token: AUTH.getToken(),
+      rowKey: String(rowKey),
+      fields: JSON.stringify(changes)
+    });
+    if (!data.ok) throw new Error(data.error || 'update failed');
+
+    // Optimistic local update so Timeline reflects the change immediately
+    const idx = STATE.rows.findIndex(x => String(x['#']) === String(rowKey));
+    if (idx !== -1) {
+      STATE.rows[idx] = { ...STATE.rows[idx], ...changes };
+      // Refresh objective list in case Objective was changed to a new value
+      STATE.objectives = Array.from(new Set(
+        STATE.rows.map(x => (x.Objective || '').trim()).filter(Boolean)
+      )).sort((a, b) => a.localeCompare(b));
+      writeCachedData();
+      populateTimelineFilters();
+      renderTimeline();
+      renderMetrics();
+    }
+    closeDetailModal();
+    toast('Changes saved.');
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'Save changes';
+    showDetailEditError(err.message);
+  }
+}
+
+function showDetailEditError(msg) {
+  const el = document.getElementById('detailEditError');
+  if (!el) return;
+  el.textContent = msg;
+  el.hidden = false;
 }
 
 // ─── Submit form (lives in the Backlog tab) ────────────────────────────

@@ -769,17 +769,13 @@ a:hover { text-decoration: underline; }
 
 /* ─── Detail modal (initiative click) ────────────────────────────────── */
 .detail-modal-card { max-width: 720px; }
-.detail-modal-body { padding: 0 24px 24px; }
+.detail-modal-body { padding: 16px 24px 24px; }
 
+/* Flat layout — no nested-card framing inside the modal */
 .detail-modal-meta {
-  border-left: 3px solid var(--border);
-  padding: 14px 16px; margin: 16px 0 20px;
-  background: var(--surface); border-radius: var(--radius);
+  padding: 0; margin: 0 0 18px;
+  background: transparent; border: 0; border-radius: 0;
 }
-.detail-modal-meta.horizon-now   { border-left-color: var(--momo); }
-.detail-modal-meta.horizon-next  { border-left-color: var(--orange); }
-.detail-modal-meta.horizon-later { border-left-color: var(--ink-3); }
-
 .detail-modal-chips {
   display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
   margin-top: 8px;
@@ -789,6 +785,47 @@ a:hover { text-decoration: underline; }
   text-decoration: none;
 }
 .detail-modal-cta:hover { text-decoration: none; }
+
+/* ─── Detail modal — editable form ──────────────────────────────────── */
+.detail-edit-form .field { margin-bottom: 14px; }
+.detail-edit-form .field-label {
+  display: block; font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.4px; color: var(--ink-3); margin-bottom: 4px;
+}
+.detail-edit-form input[type="text"],
+.detail-edit-form input[type="url"],
+.detail-edit-form select,
+.detail-edit-form textarea {
+  width: 100%; box-sizing: border-box;
+  font: inherit; font-size: 14px; color: var(--ink-2);
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--white);
+}
+.detail-edit-form textarea { resize: vertical; min-height: 56px; line-height: 1.5; }
+.detail-edit-form input:focus,
+.detail-edit-form select:focus,
+.detail-edit-form textarea:focus {
+  outline: none; border-color: var(--momo);
+  box-shadow: 0 0 0 2px var(--momo-light);
+}
+
+.form-grid-2 {
+  display: grid; gap: 14px; grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 560px) {
+  .form-grid-2 { grid-template-columns: 1fr; }
+}
+
+.when-pair { display: flex; gap: 8px; }
+.when-pair select { flex: 1; }
+
+.detail-edit-foot {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 12px; flex-wrap: wrap;
+  margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border);
+}
+.detail-edit-meta { font-size: 12px; color: var(--ink-3); }
+.detail-edit-actions { display: flex; gap: 8px; align-items: center; }
 
 .detail-modal-content h4 {
   font-size: 11px; font-weight: 700; text-transform: uppercase;
