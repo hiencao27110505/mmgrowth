@@ -655,47 +655,129 @@ function closeDetailModal() {
 }
 
 // ─── Submit form (lives in the Backlog tab) ────────────────────────────
-// Helper: catches lazy/cheating input — repeated character patterns
-// ("ABCABCABC..."), single-char spam ("AAAA"), or single-word filler ("user
-// user user"). Real prose has lexical diversity and no chunk repetition.
-function looksLikeRealText(s, minDistinctWords) {
+// Two-tier validation, by design:
+//   1. INTEGRITY_CHECKS — hidden anti-cheat. Surfaced ONLY in the error popup
+//      after the user clicks Submit. Tightened heuristics (~90% catch rate)
+//      so cheaters can't iterate against visible rules.
+//   2. QUALITY_CHECKS — visible Amazonian writing rules. Shown inline at each
+//      field as a live checklist so users self-coach to a clearer submission.
+
+// Hidden anti-cheat. Returns {ok:true} or {ok:false, reason:'short label'}.
+// Catches: chunk repetition, char/word dominance, low lexical diversity,
+// vowel-less "words", keyboard mashing, low bigram variety, missing spaces,
+// over-long fake words, mostly-non-letter content.
+function validateRealText(s, minDistinctWords) {
   const text = String(s || '').trim();
-  if (text.length === 0) return false;
-  // Reject any 1–5 char chunk that repeats 4+ times in a row.
-  // Catches: "ABCABCABCABC", "lalalala", "aaaaa", "abc abc abc abc".
-  if (/(.{1,5})\1{3,}/i.test(text)) return false;
-  // Reject if a single character makes up >50% of the alphanumeric content.
-  const alnum = text.replace(/[^\p{L}\p{N}]/gu, '');
-  if (alnum.length > 0) {
-    const charCounts = {};
-    for (const ch of alnum.toLowerCase()) charCounts[ch] = (charCounts[ch] || 0) + 1;
-    const topChar = Math.max(...Object.values(charCounts));
-    if (topChar / alnum.length > 0.5) return false;
+  if (!text) return { ok: false, reason: 'is empty' };
+
+  // Repeated chunk (1–8 chars repeating 3+ times in a row)
+  // Catches: "ABCABCABC", "lalalala", "aaaaa", "blah blah blah blah".
+  if (/(.{1,8})\1{2,}/i.test(text)) return { ok: false, reason: 'contains a repeated pattern (e.g. "ABCABC…")' };
+
+  // Spaces — real prose has multiple words separated by spaces
+  const spaceCount = (text.match(/\s/g) || []).length;
+  if (spaceCount < 4) return { ok: false, reason: 'needs more spaces — write real, multi-word sentences' };
+
+  // Mostly-letters — discount whitespace; ≥50% should be letters
+  const nonSpace = text.replace(/\s/g, '');
+  const letterCount = (text.match(/\p{L}/gu) || []).length;
+  if (nonSpace.length > 0 && letterCount / nonSpace.length < 0.5) {
+    return { ok: false, reason: 'has too few letters (mostly digits/symbols)' };
   }
-  // Tokenize Unicode letter/digit runs and require N distinct words.
-  const words = text.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
+
+  // Single character dominance — tightened to 30% (was 50%)
+  const alnum = text.replace(/[^\p{L}\p{N}]/gu, '').toLowerCase();
+  if (alnum.length >= 10) {
+    const charCounts = {};
+    for (const ch of alnum) charCounts[ch] = (charCounts[ch] || 0) + 1;
+    const topChar = Math.max(...Object.values(charCounts));
+    if (topChar / alnum.length > 0.30) return { ok: false, reason: 'overuses a single character' };
+  }
+
+  // Tokenize Unicode letter/digit runs
+  const words = (text.toLowerCase().match(/[\p{L}\p{N}]+/gu) || []);
+  if (words.length < 5) return { ok: false, reason: 'has too few words to be a real sentence' };
+
+  // Distinct-words minimum
   const distinct = new Set(words);
-  if (distinct.size < minDistinctWords) return false;
-  // Reject if the same word makes up >35% of all words ("user user user...").
+  if (distinct.size < minDistinctWords) {
+    return { ok: false, reason: `needs ${minDistinctWords}+ distinct words (has ${distinct.size})` };
+  }
+
+  // Lexical diversity ratio — distinct/total ≥ 0.5 for non-trivial input
+  if (words.length >= 8 && distinct.size / words.length < 0.5) {
+    return { ok: false, reason: 'too many repeated words — write real prose, not filler' };
+  }
+
+  // Single word dominance — tightened to 25% (was 35%)
   if (words.length >= 6) {
     const wordCounts = {};
     words.forEach(w => { wordCounts[w] = (wordCounts[w] || 0) + 1; });
     const topWord = Math.max(...Object.values(wordCounts));
-    if (topWord / words.length > 0.35) return false;
+    if (topWord / words.length > 0.25) return { ok: false, reason: 'overuses a single word' };
   }
-  return true;
+
+  // Average word length — humans average 3–7 chars; >10 is suspicious junk
+  const avgLen = words.reduce((sum, w) => sum + w.length, 0) / words.length;
+  if (avgLen > 10) return { ok: false, reason: 'has unusually long "words" (likely junk)' };
+
+  // Vowel content — for words 4+ chars, most should contain a vowel
+  // (covers Latin + full Vietnamese vowel range with diacritics)
+  const VOWEL_RE = /[aeiouyăâêôơưáàảãạắằẳẵặấầẩẫậéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ]/i;
+  const longWords = words.filter(w => w.length >= 4);
+  if (longWords.length >= 3) {
+    const vowelless = longWords.filter(w => !VOWEL_RE.test(w));
+    if (vowelless.length / longWords.length > 0.30) {
+      return { ok: false, reason: 'contains many "words" without vowels (likely junk)' };
+    }
+  }
+
+  // Keyboard mashing — common left-to-right roll patterns
+  const KEYBOARD_ROLLS = ['qwerty', 'wertyu', 'ertyui', 'rtyuio',
+                          'asdfgh', 'sdfghj', 'dfghjk', 'fghjkl',
+                          'zxcvbn', 'xcvbnm'];
+  if (KEYBOARD_ROLLS.some(r => alnum.includes(r))) {
+    return { ok: false, reason: 'contains a keyboard-mashing pattern (qwerty, asdfgh…)' };
+  }
+
+  // Bigram diversity — catches subtle repetition the chunk regex misses.
+  // For 30+ chars of alnum, distinct adjacent pairs should be ≥ 25%.
+  if (alnum.length >= 30) {
+    const bigrams = new Set();
+    for (let i = 0; i < alnum.length - 1; i++) bigrams.add(alnum.slice(i, i + 2));
+    if (bigrams.size / (alnum.length - 1) < 0.25) {
+      return { ok: false, reason: 'lacks character variety (looks like a repeated pattern)' };
+    }
+  }
+
+  return { ok: true };
 }
 
-// Quality rules — coaching + gating. Each field combines:
-//   1. Length / topic basics
-//   2. Amazonian writing principles (no fluff/weasel/jargon)
-//   3. Anti-cheat heuristics (real prose, distinct words, no character spam)
+// Per-field minimum distinct-word counts for the integrity check
+const INTEGRITY_CHECKS = {
+  what: { minDistinctWords: 6,  fieldLabel: 'What' },
+  why:  { minDistinctWords: 10, fieldLabel: 'Why'  },
+  how:  { minDistinctWords: 6,  fieldLabel: 'How'  }
+};
+
+function runIntegrityChecks() {
+  const failures = [];
+  ['what', 'why', 'how'].forEach(field => {
+    const cap = field.charAt(0).toUpperCase() + field.slice(1);
+    const value = (document.getElementById('f' + cap) || {}).value || '';
+    const cfg = INTEGRITY_CHECKS[field];
+    const result = validateRealText(value, cfg.minDistinctWords);
+    if (!result.ok) failures.push({ field, fieldLabel: cfg.fieldLabel, reason: result.reason });
+  });
+  return failures;
+}
+
+// VISIBLE Amazonian writing rules. Each item shows live next to its field as a
+// coaching checklist. Length floors stay here (clarity, not anti-cheat).
 const QUALITY_CHECKS = {
   what: [
     { label: 'At least 40 characters — specific & complete',
       test: s => s.trim().length >= 40 },
-    { label: 'Reads like a real sentence — 6+ distinct words, no character spam',
-      test: s => looksLikeRealText(s, 6) },
     { label: 'Avoids vague verbs (improve, enhance, optimize, cải thiện…)',
       test: s => s.trim().length > 0 && !/(improve|enhance|optimize|better|nicer|great|cải\s*thiện|tối\s*ưu|nâng\s*cao|tốt\s*hơn)/i.test(s) },
     { label: 'No marketing fluff (amazing, world-class, seamless, magical, đột phá…)',
@@ -704,8 +786,6 @@ const QUALITY_CHECKS = {
   why: [
     { label: 'At least 60 characters — gives context, not a tagline',
       test: s => s.trim().length >= 60 },
-    { label: 'Reads like a real sentence — 10+ distinct words, no character spam',
-      test: s => looksLikeRealText(s, 10) },
     { label: 'Includes data — a number tied to a metric (e.g. "30% drop-off", "200 tickets")',
       test: s => {
         // Require BOTH a number AND a metric/unit word, OR a quantitative phrase.
@@ -721,8 +801,6 @@ const QUALITY_CHECKS = {
   how: [
     { label: 'At least 40 characters — concrete approach',
       test: s => s.trim().length >= 40 },
-    { label: 'Reads like a real sentence — 6+ distinct words, no character spam',
-      test: s => looksLikeRealText(s, 6) },
     { label: 'Mentions scope, MVP, or an alternative considered',
       test: s => /(\bmvp\b|\bv1\b|\bv2\b|scope|phase|alternative|instead|trade[-\s]?off|fallback|out\s*of\s*scope|phạm\s*vi|giai\s*đoạn|lựa\s*chọn|thay\s*vì)/i.test(s) },
     { label: 'No corporate jargon (synergy, leverage, ecosystem, holistic, hệ sinh thái…)',
@@ -731,6 +809,10 @@ const QUALITY_CHECKS = {
 };
 
 function renderChecklists() {
+  // Any edit clears a stale popup from a prior failed submit
+  const formErrEl = document.getElementById('formError');
+  if (formErrEl) formErrEl.hidden = true;
+
   ['what', 'why', 'how'].forEach(field => {
     const cap = field.charAt(0).toUpperCase() + field.slice(1);
     const input = document.getElementById('f' + cap);
@@ -849,12 +931,21 @@ function populateObjectiveDropdown() {
 async function handleSubmit(e) {
   e.preventDefault();
 
-  // Quality validation — block submit if any rule fails, highlight what's wrong
-  const failing = collectFailingFields();
-  if (failing.size > 0) {
-    highlightFailingFields(failing);
-    showFormError('Please address the highlighted requirements before submitting.');
-    scrollToFirstFailing(failing);
+  // Run BOTH validations together. Integrity errors (anti-cheat) appear in the
+  // popup with specific reasons; Amazonian rule failures stay highlighted inline.
+  const integrityFailures = runIntegrityChecks();
+  const failingQuality    = collectFailingFields();
+
+  if (integrityFailures.length > 0 || failingQuality.size > 0) {
+    const allFailing = new Set(failingQuality);
+    integrityFailures.forEach(f => allFailing.add(f.field));
+    highlightFailingFields(allFailing);
+    if (integrityFailures.length > 0) {
+      showFormErrorList(integrityFailures);
+    } else {
+      showFormError('Please address the highlighted requirements before submitting.');
+    }
+    scrollToFirstFailing(allFailing);
     return;
   }
 
@@ -899,6 +990,19 @@ async function handleSubmit(e) {
 function showFormError(msg) {
   const el = document.getElementById('formError');
   el.textContent = msg;
+  el.hidden = false;
+}
+
+// Anti-cheat reasons: bullet list with the field name so the user knows what to fix.
+function showFormErrorList(failures) {
+  const el = document.getElementById('formError');
+  el.innerHTML =
+    '<strong>This doesn\'t read like a real submission.</strong>' +
+    '<ul style="margin:6px 0 0 18px;padding:0">' +
+      failures.map(f =>
+        `<li><strong>${escapeHtml(f.fieldLabel)}</strong> ${escapeHtml(f.reason)}.</li>`
+      ).join('') +
+    '</ul>';
   el.hidden = false;
 }
 
