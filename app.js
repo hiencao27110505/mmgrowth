@@ -136,9 +136,21 @@ function bindUI() {
   });
   renderChecklists();
 
-  // Objective dropdown — show "Other" input when "Other (specify)" is chosen
-  document.getElementById('fObjective').addEventListener('change', (e) => {
-    document.getElementById('fObjectiveOtherWrap').hidden = e.target.value !== '__other__';
+  // Objective combobox — re-render checklist as user types/picks (so the
+  // form's overall error highlight clears once they've entered something).
+  document.getElementById('fObjective').addEventListener('input', renderChecklists);
+
+  // Rules-toggle buttons — collapse/expand the per-field writing-rules list
+  document.querySelectorAll('.idea-rules-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const field = btn.dataset.rulesFor;
+      const cap = field.charAt(0).toUpperCase() + field.slice(1);
+      const list = document.getElementById('check' + cap);
+      if (!list) return;
+      const open = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+      list.hidden = open;
+    });
   });
 
   // (Timeline filter listeners attached inside populateTimelineFilters —
@@ -177,7 +189,7 @@ async function fetchData(forceRefresh = false) {
       STATE.backlogRows = cached.backlogRows;
       STATE.objectives  = cached.objectives;
       STATE.fetchedAt   = cached.fetchedAt;
-      populateObjectiveDropdown();
+      populateObjectiveDatalist();
       renderAll();
       updateLastUpdated();
       return;
@@ -197,7 +209,7 @@ async function fetchData(forceRefresh = false) {
     )).sort((a, b) => a.localeCompare(b));
     STATE.fetchedAt = Date.now();
     writeCachedData();
-    populateObjectiveDropdown();
+    populateObjectiveDatalist();
     renderAll();
     updateLastUpdated();
   } catch (err) {
@@ -304,7 +316,7 @@ function loadMockData() {
       'User Flow': '', Prototype: '', When: '2026 Q4',
       Status: 'Discovery', Who: 'Hân', 'Related Docs': '' }
   ];
-  populateObjectiveDropdown();
+  populateObjectiveDatalist();
   renderAll();
 }
 
@@ -1121,8 +1133,12 @@ const QUALITY_CHECKS = {
   ]
 };
 
+// Per-field minimum char thresholds — used for the live counter under each
+// textarea. Mirrors the corresponding QUALITY_CHECKS length rule.
+const FIELD_MIN_CHARS = { what: 40, why: 60, how: 40 };
+
 function renderChecklists() {
-  // Any edit clears a stale popup from a prior failed submit
+  // Any edit clears a stale error banner from a prior failed submit
   const formErrEl = document.getElementById('formError');
   if (formErrEl) formErrEl.hidden = true;
 
@@ -1130,8 +1146,10 @@ function renderChecklists() {
     const cap = field.charAt(0).toUpperCase() + field.slice(1);
     const input = document.getElementById('f' + cap);
     const container = document.getElementById('check' + cap);
-    if (!container) return;
-    const value = (input || {}).value || '';
+    if (!container || !input) return;
+    const value = input.value || '';
+
+    // Render the rules list (still hidden behind the toggle until expanded)
     const items = QUALITY_CHECKS[field].map(c => {
       const passed = c.test(value);
       return `<li class="${passed ? 'is-passed' : ''}">
@@ -1141,23 +1159,49 @@ function renderChecklists() {
     }).join('');
     container.innerHTML = items;
 
-    // If the user has fixed all checks for this field, clear its error highlight
-    const allPass = QUALITY_CHECKS[field].every(c => c.test(value));
-    if (input && allPass) {
+    // Count passing rules for the toggle indicator
+    const total = QUALITY_CHECKS[field].length;
+    const passed = QUALITY_CHECKS[field].filter(c => c.test(value)).length;
+    const allPass = passed === total;
+
+    // Live char counter — turns green + ✓ when min is met
+    const counterEl = document.querySelector(`[data-counter="${field}"]`);
+    if (counterEl) {
+      const min = FIELD_MIN_CHARS[field] || 0;
+      const len = value.trim().length;
+      const met = len >= min;
+      counterEl.classList.toggle('is-met', met);
+      counterEl.textContent = met
+        ? `${len} chars`
+        : `${len} / ${min} chars`;
+    }
+
+    // Rules-toggle indicator (○ → ✓ green when all pass, ● orange when partial)
+    const toggleEl = document.querySelector(`[data-rules-for="${field}"]`);
+    if (toggleEl) {
+      toggleEl.classList.toggle('is-passing', allPass);
+      toggleEl.classList.toggle('is-failing', !allPass && passed > 0);
+      const labelEl = document.querySelector(`[data-rules-label-for="${field}"]`);
+      const iconEl = toggleEl.querySelector('.rules-icon');
+      if (iconEl) iconEl.textContent = allPass ? '✓' : (passed > 0 ? '●' : '○');
+      if (labelEl) {
+        labelEl.textContent = value.trim().length === 0
+          ? 'writing rules'
+          : `${passed}/${total} rules met`;
+      }
+    }
+
+    // Clear error highlight once all rules pass
+    if (allPass) {
       input.classList.remove('has-error');
       container.classList.remove('show-failed');
     }
   });
 
-  // Objective field also clears its highlight when satisfied
-  const objSel = document.getElementById('fObjective');
-  const objOther = document.getElementById('fObjectiveOther');
-  const objectiveOK = (objSel.value && objSel.value !== '__other__')
-                  || (objSel.value === '__other__' && (objOther || {}).value && objOther.value.trim());
-  if (objectiveOK) {
-    objSel.classList.remove('has-error');
-    if (objOther) objOther.classList.remove('has-error');
-  }
+  // Objective field — combobox now, no separate "Other" input. Just clear
+  // the highlight when something is typed/picked.
+  const obj = document.getElementById('fObjective');
+  if (obj && obj.value && obj.value.trim()) obj.classList.remove('has-error');
 }
 
 // Returns set of field keys that fail validation. Used by handleSubmit.
@@ -1168,11 +1212,8 @@ function collectFailingFields() {
     const value = (document.getElementById('f' + cap) || {}).value || '';
     if (!QUALITY_CHECKS[field].every(c => c.test(value))) failing.add(field);
   });
-  const objVal = document.getElementById('fObjective').value;
-  const otherVal = (document.getElementById('fObjectiveOther') || {}).value || '';
-  const objectiveOK = (objVal && objVal !== '__other__')
-                  || (objVal === '__other__' && otherVal.trim());
-  if (!objectiveOK) failing.add('objective');
+  const objVal = (document.getElementById('fObjective') || {}).value || '';
+  if (!objVal.trim()) failing.add('objective');
   return failing;
 }
 
@@ -1181,17 +1222,19 @@ function highlightFailingFields(failing) {
     const cap = field.charAt(0).toUpperCase() + field.slice(1);
     const input = document.getElementById('f' + cap);
     const checklist = document.getElementById('check' + cap);
+    const toggle = document.querySelector(`[data-rules-for="${field}"]`);
     if (failing.has(field)) {
       input && input.classList.add('has-error');
       checklist && checklist.classList.add('show-failed');
+      // Auto-expand the rules list so the user can see what failed
+      if (toggle && toggle.getAttribute('aria-expanded') !== 'true') {
+        toggle.click();
+      }
     }
   });
   if (failing.has('objective')) {
-    document.getElementById('fObjective').classList.add('has-error');
-    const other = document.getElementById('fObjectiveOther');
-    if (other && document.getElementById('fObjective').value === '__other__') {
-      other.classList.add('has-error');
-    }
+    const obj = document.getElementById('fObjective');
+    if (obj) obj.classList.add('has-error');
   }
 }
 
@@ -1208,12 +1251,17 @@ function scrollToFirstFailing(failing) {
 
 function resetSubmitForm() {
   document.getElementById('submitForm').reset();
-  document.getElementById('fObjectiveOtherWrap').hidden = true;
   document.getElementById('formError').hidden = true;
   // Clear any error highlights from a prior failed attempt
   document.querySelectorAll('.has-error').forEach(el => el.classList.remove('has-error'));
   document.querySelectorAll('.quality-list.show-failed').forEach(el => el.classList.remove('show-failed'));
-  renderChecklists(); // re-render so all items go back to unchecked
+  // Collapse all rules toggles back to closed
+  document.querySelectorAll('.idea-rules-toggle[aria-expanded="true"]').forEach(t => {
+    t.setAttribute('aria-expanded', 'false');
+    const target = document.getElementById('check' + t.dataset.rulesFor.charAt(0).toUpperCase() + t.dataset.rulesFor.slice(1));
+    if (target) target.hidden = true;
+  });
+  renderChecklists();
 }
 
 // Confetti celebration on successful submit. MoMo brand colors. Fires three
@@ -1233,12 +1281,15 @@ function celebrateSubmit() {
   setTimeout(() => confetti({ ...base, particleCount: 80, spread: 160, startVelocity: 25, origin: { x: 0.5, y: 0.2 } }), 540);
 }
 
-function populateObjectiveDropdown() {
-  const sel = document.getElementById('fObjective');
-  sel.innerHTML =
-    '<option value="" disabled selected>— Select an objective —</option>' +
-    STATE.objectives.map(o => `<option value="${escapeAttr(o)}">${escapeHtml(o)}</option>`).join('') +
-    '<option value="__other__">Other (specify)…</option>';
+// Combobox: input + datalist. User can pick from existing objectives or type
+// a new one. Whatever's in the input is what gets submitted — the backend
+// treats existing-vs-new identically (just a string in the Objective column).
+function populateObjectiveDatalist() {
+  const list = document.getElementById('objectiveSuggestions');
+  if (!list) return;
+  list.innerHTML = STATE.objectives
+    .map(o => `<option value="${escapeAttr(o)}"></option>`)
+    .join('');
 }
 
 async function handleSubmit(e) {
@@ -1262,10 +1313,8 @@ async function handleSubmit(e) {
     return;
   }
 
-  const objSel = document.getElementById('fObjective').value;
-  const objOther = document.getElementById('fObjectiveOther').value.trim();
-  const isNew = objSel === '__other__';
-  const objective = isNew ? objOther : objSel;
+  const objective = document.getElementById('fObjective').value.trim();
+  const isNew = objective.length > 0 && !STATE.objectives.includes(objective);
 
   const body = {
     token: AUTH.getToken() || 'mock-token',

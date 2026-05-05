@@ -630,32 +630,115 @@ a:hover { text-decoration: underline; }
 }
 
 /* ─── Submit-an-idea modal (Timeline header → popup) ─────────────────── */
-.submit-modal-card { max-width: 920px; }
-.submit-modal-body {
-  padding: 16px 24px 24px;
-  display: grid; gap: 20px;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  align-items: start;
+.submit-modal-card { max-width: 580px; }
+.idea-form { padding: 8px 28px 24px; }
+.idea-form-intro {
+  font-size: 13px; color: var(--ink-3); line-height: 1.55;
+  margin: 0 0 22px;
+  padding-bottom: 18px; border-bottom: 1px solid var(--border);
 }
-@media (max-width: 820px) {
-  .submit-modal-body { grid-template-columns: 1fr; }
-}
-.submit-form-wrapper { min-width: 0; }
-.submit-form-sub {
-  font-size: 13px; color: var(--ink-3); margin: 0 0 16px;
-}
-.submit-form-actions { display: flex; gap: 8px; align-items: center; }
 
-/* Writing-tips panel — now lives inside the submit modal */
-.writing-tips-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 20px 22px;
-  position: sticky; top: 0;
-  max-height: 70vh; overflow-y: auto;
+/* Field block — label + helper + control + meta + rules */
+.idea-field { margin-bottom: 24px; }
+.idea-label {
+  display: block;
+  font-size: 14px; font-weight: 600; color: var(--ink);
+  margin-bottom: 4px;
 }
-@media (max-width: 820px) {
-  .writing-tips-card { position: static; max-height: none; }
+.idea-hint {
+  font-size: 12px; color: var(--ink-3); line-height: 1.5;
+  margin: 0 0 8px;
+}
+.idea-hint em { font-style: italic; color: var(--ink-2); }
+
+.idea-form input[type="text"],
+.idea-form textarea {
+  width: 100%; box-sizing: border-box;
+  font: inherit; font-size: 14px; color: var(--ink);
+  padding: 9px 12px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--white); line-height: 1.5;
+}
+.idea-form textarea { resize: vertical; min-height: 60px; }
+.idea-form input[type="text"]:focus,
+.idea-form textarea:focus {
+  outline: none; border-color: var(--momo);
+  box-shadow: 0 0 0 3px var(--momo-light);
+}
+
+/* Counter + rules-toggle row directly under the field */
+.idea-meta {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 12px; margin-top: 6px;
+  font-size: 12px;
+}
+.idea-counter {
+  color: var(--ink-3); transition: color 0.15s ease;
+}
+.idea-counter.is-met { color: var(--green); font-weight: 500; }
+.idea-counter.is-met::before { content: '✓ '; }
+
+.idea-rules-toggle {
+  background: transparent; border: 0; cursor: pointer;
+  font: inherit; font-size: 12px; color: var(--ink-3);
+  padding: 2px 0;
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: color 0.15s ease;
+}
+.idea-rules-toggle:hover { color: var(--ink); }
+.idea-rules-toggle .rules-icon { font-size: 14px; line-height: 1; }
+.idea-rules-toggle.is-passing .rules-icon { color: var(--green); }
+.idea-rules-toggle.is-passing { color: var(--green); }
+.idea-rules-toggle.is-failing .rules-icon { color: var(--orange); }
+.idea-rules-toggle .rules-caret {
+  font-size: 9px; transition: transform 0.15s ease;
+}
+.idea-rules-toggle[aria-expanded="true"] .rules-caret { transform: rotate(90deg); }
+
+/* Rules list — collapsed by default, expands when toggled */
+.idea-form .quality-list {
+  list-style: none; padding: 10px 12px; margin: 8px 0 0;
+  background: var(--surface); border-radius: 6px;
+  font-size: 12px; line-height: 1.6;
+}
+.idea-form .quality-list li {
+  display: flex; align-items: flex-start; gap: 8px;
+  color: var(--ink-3); padding: 2px 0;
+}
+.idea-form .quality-list li.is-passed { color: var(--green); }
+.idea-form .quality-list .check-icon {
+  flex-shrink: 0; font-size: 13px; line-height: 1.4; width: 14px;
+}
+.idea-form .quality-list.show-failed li:not(.is-passed) {
+  color: var(--red);
+}
+.idea-form .quality-list.show-failed li:not(.is-passed) .check-icon {
+  color: var(--red);
+}
+
+/* Foot bar — submit + cancel */
+.idea-form-foot {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 12px; flex-wrap: wrap;
+  padding-top: 16px; margin-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.idea-meta-inline { font-size: 12px; color: var(--ink-3); }
+.idea-meta-inline strong { color: var(--ink-2); font-weight: 600; }
+.idea-form-actions { display: flex; gap: 8px; align-items: center; }
+
+/* Error banner inside form */
+.idea-form .form-error {
+  background: #fce8e8; color: var(--red);
+  border: 1px solid #f5c2c2; border-radius: 6px;
+  padding: 10px 14px; font-size: 13px; line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+/* Red-glow input when submit attempted with rule failures */
+.idea-form input.has-error,
+.idea-form textarea.has-error {
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.12);
 }
 .tips-title {
   font-family: 'DM Serif Display', serif;
@@ -722,16 +805,6 @@ a:hover { text-decoration: underline; }
 }
 .quality-list li.is-passed .check-icon { color: var(--green); }
 .quality-list li:not(.is-passed) .check-icon { color: var(--ink-3); opacity: 0.55; }
-
-.backlog-form-foot {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; flex-wrap: wrap; margin-top: 12px;
-  padding-top: 12px; border-top: 1px solid var(--border);
-}
-.form-meta-inline {
-  font-size: 12px; color: var(--ink-3);
-}
-.form-meta-inline strong { color: var(--ink-2); }
 
 /* Validation error state — applied to inputs/textareas/selects on submit attempt */
 .field input.has-error,
