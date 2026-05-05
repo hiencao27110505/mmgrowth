@@ -352,7 +352,6 @@ function applyTimelineFilters(rows) {
 }
 
 function onFilterChange(key, value) {
-  console.log('[filter]', key, '→', value);
   STATE.filters[key] = value;
   updateClearFiltersBtn();
   renderTimeline();
@@ -412,19 +411,30 @@ function updateClearFiltersBtn() {
 }
 
 // ─── Timeline (grouped by Month) ───────────────────────────────────────
+// Column STRUCTURE is built from STATE.rows (unfiltered) so the columns stay
+// stable across filter changes — only the cards inside change. Columns with
+// no matching cards show a small "No matches" placeholder instead of vanishing.
 function renderTimeline() {
   const filtered = applyTimelineFilters(STATE.rows);
+  const filteredKeys = new Set(filtered.map(r => monthKey(r.When)));
+
+  // Stable column scaffold from ALL rows
   const groups = {};
+  STATE.rows.forEach(r => {
+    const key = monthKey(r.When);
+    if (!groups[key]) groups[key] = { label: monthLabel(r.When), allRows: [], rows: [] };
+    groups[key].allRows.push(r);
+  });
+  // Distribute the surviving filtered rows into the existing month buckets
   filtered.forEach(r => {
     const key = monthKey(r.When);
-    if (!groups[key]) groups[key] = { label: monthLabel(r.When), rows: [] };
-    groups[key].rows.push(r);
+    if (groups[key]) groups[key].rows.push(r);
   });
 
   // Filter-count chip: how many cards survived the filter (only when active)
-  const countEl = document.getElementById('filterCount');
   const f = STATE.filters;
   const hasAny = !!(f.owner || f.status || f.quality);
+  const countEl = document.getElementById('filterCount');
   if (countEl) {
     countEl.hidden = !hasAny;
     countEl.textContent = `${filtered.length} of ${STATE.rows.length}`;
@@ -438,9 +448,8 @@ function renderTimeline() {
   });
 
   if (sortedKeys.length === 0) {
-    document.getElementById('timelineColumns').innerHTML = hasAny
-      ? '<div class="empty-state">No initiatives match the current filters.</div>'
-      : '<div class="empty-state">No initiatives in the sheet yet.</div>';
+    document.getElementById('timelineColumns').innerHTML =
+      '<div class="empty-state">No initiatives in the sheet yet.</div>';
     return;
   }
 
@@ -448,18 +457,27 @@ function renderTimeline() {
     const g = groups[key];
     const cls = [
       g.label.isNow  ? 'is-now'  : '',
-      g.label.isPast ? 'is-past' : ''
+      g.label.isPast ? 'is-past' : '',
+      // Dim columns that lost all their cards to the filter, so the eye
+      // skips past them instead of treating them as empty source data
+      hasAny && g.rows.length === 0 ? 'is-filtered-out' : ''
     ].filter(Boolean).join(' ');
     const suffix = g.label.isNow ? ' · Now' : '';
+    // Count badge: when a filter is active, show "visible/total" so users
+    // can see how many cards are hidden in each month at a glance.
+    const countText = hasAny
+      ? `${g.rows.length}/${g.allRows.length}`
+      : `${g.allRows.length}`;
+    const placeholder = hasAny
+      ? '<div class="empty-state" style="padding:20px 0;font-size:12px">No matches</div>'
+      : '<div class="empty-state" style="padding:20px 0;font-size:12px">No initiatives.</div>';
     return `
       <div class="timeline-col ${cls}">
         <div class="timeline-col-head">
           <span class="timeline-col-label">${escapeHtml(g.label.text)}${suffix}</span>
-          <span class="timeline-col-count">${g.rows.length}</span>
+          <span class="timeline-col-count">${countText}</span>
         </div>
-        ${g.rows.length
-          ? g.rows.map(initCardHTML).join('')
-          : '<div class="empty-state" style="padding:20px 0;font-size:12px">No initiatives.</div>'}
+        ${g.rows.length ? g.rows.map(initCardHTML).join('') : placeholder}
       </div>
     `;
   }).join('');
