@@ -133,14 +133,10 @@ function bindUI() {
   });
   renderChecklists();
 
-  // Objective dropdown — show "Other" input when chosen + re-evaluate submit gate
+  // Objective dropdown — show "Other" input when "Other (specify)" is chosen
   document.getElementById('fObjective').addEventListener('change', (e) => {
     document.getElementById('fObjectiveOtherWrap').hidden = e.target.value !== '__other__';
-    updateSubmitGate();
   });
-  // "Other (specify)" text input also gates the submit
-  const fOther = document.getElementById('fObjectiveOther');
-  if (fOther) fOther.addEventListener('input', updateSubmitGate);
 
   // (Timeline filter listeners attached inside populateTimelineFilters —
   // they need to survive each rebuild of the <select> options.)
