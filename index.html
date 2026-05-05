@@ -45,17 +45,33 @@
       <!-- View switcher -->
       <nav class="tabs">
         <button class="tab is-active" data-view="timeline">Timeline</button>
-        <button class="tab" data-view="pic">PIC <span id="pic-count" class="tab-count">0</span></button>
         <button class="tab" data-view="backlog">Backlog <span id="backlog-count" class="tab-count">0</span></button>
         <button class="tab" data-view="insights">AI Insights</button>
       </nav>
 
       <!-- Views -->
       <section id="view-timeline" class="view">
+        <div class="filter-bar" id="timelineFilters">
+          <label class="filter-pill">
+            <span class="filter-label">Owner</span>
+            <select id="filterOwner"><option value="">All</option></select>
+          </label>
+          <label class="filter-pill">
+            <span class="filter-label">Status</span>
+            <select id="filterStatus"><option value="">All</option></select>
+          </label>
+          <label class="filter-pill">
+            <span class="filter-label">Card quality</span>
+            <select id="filterQuality">
+              <option value="">All</option>
+              <option value="complete">Complete · all fields filled</option>
+              <option value="gaps">Has gaps · missing 1+ field</option>
+            </select>
+          </label>
+          <button id="clearFiltersBtn" class="btn btn-link" hidden>Clear filters</button>
+          <span id="filterCount" class="filter-count" hidden></span>
+        </div>
         <div id="timelineColumns" class="timeline"></div>
-      </section>
-      <section id="view-pic" class="view" hidden>
-        <div id="picColumns" class="timeline"></div>
       </section>
       <section id="view-backlog"  class="view" hidden>
         <div class="backlog-form-wrapper">

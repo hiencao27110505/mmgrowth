@@ -18,6 +18,7 @@ const STATE = {
   objectives: [],
   view: 'timeline',
   fetchedAt: 0,
+  filters: { owner: '', status: '', quality: '' }, // Timeline filters; '' = no filter
   synthesis: {
     stakeholder: { text: '', generatedAt: 0 },
     operational: { text: '', generatedAt: 0 }
@@ -137,6 +138,28 @@ function bindUI() {
   // "Other (specify)" text input also gates the submit
   const fOther = document.getElementById('fObjectiveOther');
   if (fOther) fOther.addEventListener('input', updateSubmitGate);
+
+  // Timeline filters
+  ['filterOwner', 'filterStatus', 'filterQuality'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('change', (e) => {
+      const key = id.replace('filter', '').toLowerCase(); // owner / status / quality
+      STATE.filters[key] = e.target.value;
+      updateClearFiltersBtn();
+      renderTimeline();
+    });
+  });
+  const clearBtn = document.getElementById('clearFiltersBtn');
+  if (clearBtn) clearBtn.addEventListener('click', () => {
+    STATE.filters = { owner: '', status: '', quality: '' };
+    ['filterOwner', 'filterStatus', 'filterQuality'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    updateClearFiltersBtn();
+    renderTimeline();
+  });
 
   // Detail modal close
   document.querySelectorAll('[data-detail-close]').forEach(el => {
@@ -295,8 +318,8 @@ function loadMockData() {
 // ─── Render orchestration ──────────────────────────────────────────────
 function renderAll() {
   renderMetrics();
+  populateTimelineFilters();
   renderTimeline();
-  renderPIC();
   renderBacklog();
   renderInsights();
 }
@@ -307,7 +330,6 @@ function switchView(view) {
     t.classList.toggle('is-active', t.dataset.view === view);
   });
   document.getElementById('view-timeline').hidden  = view !== 'timeline';
-  document.getElementById('view-pic').hidden       = view !== 'pic';
   document.getElementById('view-backlog').hidden   = view !== 'backlog';
   document.getElementById('view-insights').hidden  = view !== 'insights';
 }
@@ -334,14 +356,75 @@ function renderMetrics() {
   `).join('');
 }
 
+// ─── Timeline filters (Owner / Status / Card quality) ─────────────────
+// "Card quality" buckets initiatives by completeness of KEY_FIELDS:
+//   complete = no missing fields, gaps = at least one missing.
+function applyTimelineFilters(rows) {
+  const f = STATE.filters;
+  return rows.filter(r => {
+    if (f.owner  && (r.Who    || '').trim() !== f.owner)  return false;
+    if (f.status && (r.Status || '').trim() !== f.status) return false;
+    if (f.quality === 'complete' && missingFields(r).length > 0)  return false;
+    if (f.quality === 'gaps'     && missingFields(r).length === 0) return false;
+    return true;
+  });
+}
+
+function populateTimelineFilters() {
+  const owners = Array.from(new Set(
+    STATE.rows.map(r => (r.Who || '').trim()).filter(Boolean)
+  )).sort((a, b) => a.localeCompare(b));
+  const statuses = Array.from(new Set(
+    STATE.rows.map(r => (r.Status || '').trim()).filter(Boolean)
+  )).sort((a, b) => a.localeCompare(b));
+
+  const ownerSel  = document.getElementById('filterOwner');
+  const statusSel = document.getElementById('filterStatus');
+  if (ownerSel) {
+    const cur = STATE.filters.owner;
+    ownerSel.innerHTML = '<option value="">All</option>' +
+      owners.map(o => `<option value="${escapeAttr(o)}">${escapeHtml(o)}</option>`).join('');
+    // Keep selection if the current owner still exists, otherwise reset.
+    if (owners.includes(cur)) ownerSel.value = cur;
+    else { ownerSel.value = ''; STATE.filters.owner = ''; }
+  }
+  if (statusSel) {
+    const cur = STATE.filters.status;
+    statusSel.innerHTML = '<option value="">All</option>' +
+      statuses.map(s => `<option value="${escapeAttr(s)}">${escapeHtml(s)}</option>`).join('');
+    if (statuses.includes(cur)) statusSel.value = cur;
+    else { statusSel.value = ''; STATE.filters.status = ''; }
+  }
+  const qSel = document.getElementById('filterQuality');
+  if (qSel) qSel.value = STATE.filters.quality;
+  updateClearFiltersBtn();
+}
+
+function updateClearFiltersBtn() {
+  const f = STATE.filters;
+  const hasAny = !!(f.owner || f.status || f.quality);
+  const btn = document.getElementById('clearFiltersBtn');
+  if (btn) btn.hidden = !hasAny;
+}
+
 // ─── Timeline (grouped by Month) ───────────────────────────────────────
 function renderTimeline() {
+  const filtered = applyTimelineFilters(STATE.rows);
   const groups = {};
-  STATE.rows.forEach(r => {
+  filtered.forEach(r => {
     const key = monthKey(r.When);
     if (!groups[key]) groups[key] = { label: monthLabel(r.When), rows: [] };
     groups[key].rows.push(r);
   });
+
+  // Filter-count chip: how many cards survived the filter (only when active)
+  const countEl = document.getElementById('filterCount');
+  const f = STATE.filters;
+  const hasAny = !!(f.owner || f.status || f.quality);
+  if (countEl) {
+    countEl.hidden = !hasAny;
+    countEl.textContent = `${filtered.length} of ${STATE.rows.length}`;
+  }
 
   // Sort: chronological asc; unscheduled last
   const sortedKeys = Object.keys(groups).sort((a, b) => {
@@ -351,8 +434,9 @@ function renderTimeline() {
   });
 
   if (sortedKeys.length === 0) {
-    document.getElementById('timelineColumns').innerHTML =
-      '<div class="empty-state">No initiatives in the sheet yet.</div>';
+    document.getElementById('timelineColumns').innerHTML = hasAny
+      ? '<div class="empty-state">No initiatives match the current filters.</div>'
+      : '<div class="empty-state">No initiatives in the sheet yet.</div>';
     return;
   }
 
@@ -377,86 +461,6 @@ function renderTimeline() {
   }).join('');
 
   bindCardClicks(document.getElementById('timelineColumns'));
-}
-
-// ─── PIC view (grouped by Owner → then by Month) ───────────────────────
-// Same column layout as Timeline, but each column is a person and cards
-// inside each column are sub-grouped by ETA month so workload is visible.
-function renderPIC() {
-  // Group rows by owner
-  const owners = {};
-  STATE.rows.forEach(r => {
-    const who = (r.Who || '').trim() || '— No owner';
-    if (!owners[who]) owners[who] = [];
-    owners[who].push(r);
-  });
-
-  // Update tab count = distinct owners (excluding the no-owner bucket)
-  const ownerCount = Object.keys(owners).filter(k => k !== '— No owner').length;
-  const countEl = document.getElementById('pic-count');
-  if (countEl) countEl.textContent = ownerCount;
-
-  // Sort owners: most-loaded first (so overloaded folks pop), tiebreak alpha,
-  // unowned bucket always last.
-  const ownerKeys = Object.keys(owners).sort((a, b) => {
-    if (a === '— No owner') return 1;
-    if (b === '— No owner') return -1;
-    const diff = owners[b].length - owners[a].length;
-    return diff !== 0 ? diff : a.localeCompare(b);
-  });
-
-  const container = document.getElementById('picColumns');
-  if (!container) return;
-
-  if (ownerKeys.length === 0) {
-    container.innerHTML = '<div class="empty-state">No initiatives in the sheet yet.</div>';
-    return;
-  }
-
-  container.innerHTML = ownerKeys.map(owner => {
-    const rows = owners[owner];
-
-    // Sub-group this owner's rows by month
-    const months = {};
-    rows.forEach(r => {
-      const key = monthKey(r.When);
-      if (!months[key]) months[key] = { label: monthLabel(r.When), rows: [] };
-      months[key].rows.push(r);
-    });
-    const sortedMonths = Object.keys(months).sort((a, b) => {
-      if (a === 'unscheduled') return 1;
-      if (b === 'unscheduled') return -1;
-      return a.localeCompare(b);
-    });
-
-    return `
-      <div class="timeline-col">
-        <div class="timeline-col-head">
-          <span class="timeline-col-label">${escapeHtml(owner)}</span>
-          <span class="timeline-col-count">${rows.length}</span>
-        </div>
-        ${sortedMonths.map(mk => {
-          const m = months[mk];
-          const cls = [
-            m.label.isNow  ? 'is-now'  : '',
-            m.label.isPast ? 'is-past' : ''
-          ].filter(Boolean).join(' ');
-          const suffix = m.label.isNow ? ' · Now' : '';
-          return `
-            <div class="pic-month-group ${cls}">
-              <div class="pic-month-head">
-                <span class="pic-month-label">${escapeHtml(m.label.text)}${suffix}</span>
-                <span class="pic-month-count">${m.rows.length}</span>
-              </div>
-              ${m.rows.map(initCardHTML).join('')}
-            </div>
-          `;
-        }).join('')}
-      </div>
-    `;
-  }).join('');
-
-  bindCardClicks(container);
 }
 
 // Backwards-compat shim: initCardHTML still uses mapHorizon for the

@@ -282,24 +282,41 @@ a:hover { text-decoration: underline; }
   background: var(--momo-light); color: var(--momo);
 }
 
-/* ─── PIC view month sub-headers (inside owner columns) ─────────────── */
-.pic-month-group { margin-top: 14px; }
-.pic-month-group:first-of-type { margin-top: 0; }
-.pic-month-group.is-past { opacity: 0.7; }
-.pic-month-head {
-  display: flex; justify-content: space-between; align-items: baseline;
-  font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.5px; color: var(--ink-3);
-  padding: 4px 0 6px; margin-bottom: 6px;
-  border-bottom: 1px dashed var(--border);
+/* ─── Timeline filter bar ──────────────────────────────────────────── */
+.filter-bar {
+  display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+  margin-bottom: 18px; padding: 12px 16px;
+  background: var(--white); border: 1px solid var(--border); border-radius: var(--radius);
 }
-.pic-month-group.is-now .pic-month-head { color: var(--momo); border-bottom-color: var(--momo); }
-.pic-month-label { flex: 1; min-width: 0; }
-.pic-month-count {
-  font-size: 10px; font-weight: 600; color: var(--ink-3);
-  background: var(--surface); padding: 1px 6px; border-radius: 99px;
+.filter-pill {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--ink-3);
 }
-.pic-month-group.is-now .pic-month-count { background: var(--momo-light); color: var(--momo); }
+.filter-label {
+  text-transform: uppercase; letter-spacing: 0.5px;
+  font-weight: 700; font-size: 10px;
+}
+.filter-pill select {
+  font: inherit; font-size: 13px; color: var(--ink-2);
+  padding: 6px 28px 6px 10px; border: 1px solid var(--border); border-radius: 6px;
+  background-color: var(--white); cursor: pointer;
+  min-width: 140px; max-width: 240px;
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='none' stroke='%237a5a6e' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round' d='M1 1l4 4 4-4'/></svg>");
+  background-repeat: no-repeat; background-position: right 10px center;
+}
+.filter-pill select:focus { outline: 2px solid var(--momo); outline-offset: 1px; }
+.filter-count {
+  font-size: 11px; font-weight: 600; color: var(--ink-3);
+  background: var(--surface); padding: 3px 9px; border-radius: 99px;
+  margin-left: auto;
+}
+@media (max-width: 680px) {
+  .filter-bar { gap: 10px; padding: 10px 12px; }
+  .filter-pill select { min-width: 0; flex: 1; }
+  .filter-pill { flex: 1 0 100%; }
+  .filter-count { margin-left: 0; }
+}
 
 /* ─── Kanban ──────────────────────────────────────────────────────────── */
 .kanban {
