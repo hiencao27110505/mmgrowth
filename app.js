@@ -139,27 +139,31 @@ function bindUI() {
   const fOther = document.getElementById('fObjectiveOther');
   if (fOther) fOther.addEventListener('input', updateSubmitGate);
 
-  // Timeline filters
-  ['filterOwner', 'filterStatus', 'filterQuality'].forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener('change', (e) => {
-      const key = id.replace('filter', '').toLowerCase(); // owner / status / quality
+  // Timeline filters — event-delegated so the listener survives any DOM
+  // rebuild of the inner <select>s and runs even if bindUI fires before
+  // the elements are populated.
+  const filterBar = document.getElementById('timelineFilters');
+  if (filterBar) {
+    const FILTER_KEY = { filterOwner: 'owner', filterStatus: 'status', filterQuality: 'quality' };
+    filterBar.addEventListener('change', (e) => {
+      const key = FILTER_KEY[e.target && e.target.id];
+      if (!key) return;
       STATE.filters[key] = e.target.value;
       updateClearFiltersBtn();
       renderTimeline();
     });
-  });
-  const clearBtn = document.getElementById('clearFiltersBtn');
-  if (clearBtn) clearBtn.addEventListener('click', () => {
-    STATE.filters = { owner: '', status: '', quality: '' };
-    ['filterOwner', 'filterStatus', 'filterQuality'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.value = '';
+    filterBar.addEventListener('click', (e) => {
+      if (e.target && e.target.id === 'clearFiltersBtn') {
+        STATE.filters = { owner: '', status: '', quality: '' };
+        ['filterOwner', 'filterStatus', 'filterQuality'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.value = '';
+        });
+        updateClearFiltersBtn();
+        renderTimeline();
+      }
     });
-    updateClearFiltersBtn();
-    renderTimeline();
-  });
+  }
 
   // Detail modal close
   document.querySelectorAll('[data-detail-close]').forEach(el => {
