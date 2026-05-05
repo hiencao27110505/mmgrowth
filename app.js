@@ -414,20 +414,34 @@ function updateClearFiltersBtn() {
 // Column STRUCTURE is built from STATE.rows (unfiltered) so the columns stay
 // stable across filter changes — only the cards inside change. Columns with
 // no matching cards show a small "No matches" placeholder instead of vanishing.
+//
+// Backlog rows are merged into the "No timeline yet" column so stakeholders
+// see pending ideas alongside scheduled work. They're tagged `_isBacklog` so
+// the card template can show a small Backlog pill.
 function renderTimeline() {
-  const filtered = applyTimelineFilters(STATE.rows);
-  const filteredKeys = new Set(filtered.map(r => monthKey(r.When)));
+  const backlogTagged = STATE.backlogRows.map(r => ({ ...r, _isBacklog: true }));
+  const allRows = STATE.rows.concat(backlogTagged);
+  const filtered = applyTimelineFilters(allRows);
 
-  // Stable column scaffold from ALL rows
+  // Stable column scaffold from ALL rows (sheet + backlog)
   const groups = {};
-  STATE.rows.forEach(r => {
-    const key = monthKey(r.When);
-    if (!groups[key]) groups[key] = { label: monthLabel(r.When), allRows: [], rows: [] };
+  allRows.forEach(r => {
+    // Backlog rows always belong in the unscheduled bucket regardless of When
+    const key = r._isBacklog ? 'unscheduled' : monthKey(r.When);
+    if (!groups[key]) {
+      groups[key] = {
+        label: r._isBacklog && key === 'unscheduled'
+          ? { text: 'No timeline yet', isNow: false, isPast: false }
+          : monthLabel(r.When),
+        allRows: [],
+        rows: []
+      };
+    }
     groups[key].allRows.push(r);
   });
   // Distribute the surviving filtered rows into the existing month buckets
   filtered.forEach(r => {
-    const key = monthKey(r.When);
+    const key = r._isBacklog ? 'unscheduled' : monthKey(r.When);
     if (groups[key]) groups[key].rows.push(r);
   });
 
@@ -437,7 +451,7 @@ function renderTimeline() {
   const countEl = document.getElementById('filterCount');
   if (countEl) {
     countEl.hidden = !hasAny;
-    countEl.textContent = `${filtered.length} of ${STATE.rows.length}`;
+    countEl.textContent = `${filtered.length} of ${allRows.length}`;
   }
 
   // Sort: chronological asc; unscheduled last
@@ -555,6 +569,7 @@ function monthLabel(whenStr) {
 function initCardHTML(r) {
   const protoUrl = firstUrl(r.Prototype);
   const footParts = [];
+  if (r._isBacklog) footParts.push(`<span class="card-source-tag">Backlog</span>`);
   if (r.Status) footParts.push(`<span class="card-status ${statusClass(r.Status)}">${escapeHtml(r.Status)}</span>`);
   if (r.Who)    footParts.push(`<span class="card-foot-text">${escapeHtml(r.Who)}</span>`);
   const foot = footParts.join('<span class="card-foot-sep">·</span>');

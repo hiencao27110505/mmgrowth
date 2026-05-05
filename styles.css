@@ -396,6 +396,12 @@ a:hover { text-decoration: underline; }
 .card-status.is-blocked  { color: var(--red); }
 .card-foot-text { color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; }
 .card-foot-sep  { color: var(--ink-3); opacity: 0.4; }
+.card-source-tag {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.4px;
+  color: var(--momo); background: var(--momo-light);
+  padding: 1px 6px; border-radius: 3px;
+}
 
 /* Detail-card variants (used in modal) keep their own .detail-why/.meta-empty rules below */
 .detail-why { font-size: 13px; color: var(--ink-3); line-height: 1.5; margin-top: 6px; }
