@@ -112,16 +112,19 @@ function bindUI() {
   // Sign out
   document.getElementById('signOutBtn').addEventListener('click', () => AUTH.signOut());
 
-  // Header "Submit an idea" → switch to Backlog tab + scroll to + focus the form
-  document.getElementById('submitBtn').addEventListener('click', () => {
-    switchView('backlog');
-    setTimeout(() => {
-      const card = document.querySelector('.backlog-form-card');
-      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      const sel = document.getElementById('fObjective');
-      if (sel) sel.focus();
-    }, 30);
-  });
+  // Header "Submit an idea" → open the submit modal
+  document.getElementById('submitBtn').addEventListener('click', openSubmitModal);
+
+  // Submit modal close (delegated, same pattern as detail modal)
+  const submitModalEl = document.getElementById('submitModal');
+  if (submitModalEl) {
+    submitModalEl.addEventListener('click', (e) => {
+      if (e.target.closest('[data-submit-close]')) {
+        e.preventDefault();
+        closeSubmitModal();
+      }
+    });
+  }
 
   // Form submit
   document.getElementById('submitForm').addEventListener('submit', handleSubmit);
@@ -154,9 +157,11 @@ function bindUI() {
     });
   }
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !document.getElementById('detailModal').hidden) {
-      closeDetailModal();
-    }
+    if (e.key !== 'Escape') return;
+    // Close whichever modal is currently open. Detail modal takes precedence
+    // if (somehow) both are visible.
+    if (!document.getElementById('detailModal').hidden) closeDetailModal();
+    else if (!document.getElementById('submitModal').hidden) closeSubmitModal();
   });
 }
 
@@ -308,7 +313,6 @@ function renderAll() {
   renderMetrics();
   populateTimelineFilters();
   renderTimeline();
-  renderBacklog();
   renderInsights();
 }
 
@@ -318,7 +322,6 @@ function switchView(view) {
     t.classList.toggle('is-active', t.dataset.view === view);
   });
   document.getElementById('view-timeline').hidden  = view !== 'timeline';
-  document.getElementById('view-backlog').hidden   = view !== 'backlog';
   document.getElementById('view-insights').hidden  = view !== 'insights';
 }
 
@@ -422,33 +425,24 @@ function updateClearFiltersBtn() {
 // stable across filter changes — only the cards inside change. Columns with
 // no matching cards show a small "No matches" placeholder instead of vanishing.
 //
-// Backlog rows are merged into the "No timeline yet" column so stakeholders
-// see pending ideas alongside scheduled work. They're tagged `_isBacklog` so
-// the card template can show a small Backlog pill.
+// Submitted ideas now live in the same What&Why tab with Status='Backlog'
+// (no separate Backlog sheet read), so they appear in the "No timeline yet"
+// column naturally — no special-case merging needed.
 function renderTimeline() {
-  const backlogTagged = STATE.backlogRows.map(r => ({ ...r, _isBacklog: true }));
-  const allRows = STATE.rows.concat(backlogTagged);
-  const filtered = applyTimelineFilters(allRows);
+  const filtered = applyTimelineFilters(STATE.rows);
 
-  // Stable column scaffold from ALL rows (sheet + backlog)
+  // Stable column scaffold from STATE.rows (unfiltered)
   const groups = {};
-  allRows.forEach(r => {
-    // Backlog rows always belong in the unscheduled bucket regardless of When
-    const key = r._isBacklog ? 'unscheduled' : monthKey(r.When);
+  STATE.rows.forEach(r => {
+    const key = monthKey(r.When);
     if (!groups[key]) {
-      groups[key] = {
-        label: r._isBacklog && key === 'unscheduled'
-          ? { text: 'No timeline yet', isNow: false, isPast: false }
-          : monthLabel(r.When),
-        allRows: [],
-        rows: []
-      };
+      groups[key] = { label: monthLabel(r.When), allRows: [], rows: [] };
     }
     groups[key].allRows.push(r);
   });
   // Distribute the surviving filtered rows into the existing month buckets
   filtered.forEach(r => {
-    const key = r._isBacklog ? 'unscheduled' : monthKey(r.When);
+    const key = monthKey(r.When);
     if (groups[key]) groups[key].rows.push(r);
   });
 
@@ -458,7 +452,7 @@ function renderTimeline() {
   const countEl = document.getElementById('filterCount');
   if (countEl) {
     countEl.hidden = !hasAny;
-    countEl.textContent = `${filtered.length} of ${allRows.length}`;
+    countEl.textContent = `${filtered.length} of ${STATE.rows.length}`;
   }
 
   // Sort: chronological asc; unscheduled last
@@ -560,7 +554,6 @@ function monthLabel(whenStr) {
 function initCardHTML(r) {
   const protoUrl = firstUrl(r.Prototype);
   const footParts = [];
-  if (r._isBacklog) footParts.push(`<span class="card-source-tag">Backlog</span>`);
   if (r.Status) footParts.push(`<span class="card-status ${statusClass(r.Status)}">${escapeHtml(r.Status)}</span>`);
   if (r.Who)    footParts.push(`<span class="card-foot-text">${escapeHtml(r.Who)}</span>`);
   const foot = footParts.join('<span class="card-foot-sep">·</span>');
@@ -633,71 +626,28 @@ function linkSectionOrPlaceholder(label, value) {
   return `<h4>${label}</h4><p class="field-empty">— no link added</p>`;
 }
 
-// ─── Backlog view ───────────────────────────────────────────────────────
-function renderBacklog() {
-  const list = STATE.backlogRows;
-  document.getElementById('backlog-count').textContent = list.length;
+// ─── Submit-an-idea modal (opens from header button) ───────────────────
+function openSubmitModal() {
+  const modal = document.getElementById('submitModal');
+  if (!modal) return;
+  modal.hidden = false;
+  document.body.style.overflow = 'hidden';
+  // Reset any stale error highlights from a previous attempt
+  resetSubmitForm();
+  setTimeout(() => {
+    const sel = document.getElementById('fObjective');
+    if (sel) sel.focus();
+  }, 30);
+}
 
-  const container = document.getElementById('backlogCardsList');
-  if (!container) return;
-
-  if (list.length === 0) {
-    container.innerHTML = '<div class="empty-state" style="padding:32px 0">No submissions yet. Be the first to suggest an idea using the form above.</div>';
-    return;
+function closeSubmitModal() {
+  const modal = document.getElementById('submitModal');
+  if (!modal) return;
+  modal.hidden = true;
+  // Only restore body overflow if the detail modal isn't also open
+  if (document.getElementById('detailModal').hidden) {
+    document.body.style.overflow = '';
   }
-
-  // Newest first
-  const sorted = [...list].sort((a, b) =>
-    String(b.Timestamp || '').localeCompare(String(a.Timestamp || ''))
-  );
-
-  container.innerHTML = `
-    <div class="cards-list cards-list-stack">
-      ${sorted.map(backlogCardHTML).join('')}
-    </div>
-  `;
-  container.querySelectorAll('.detail-head').forEach(head => {
-    head.addEventListener('click', () => head.parentElement.classList.toggle('is-open'));
-  });
-}
-
-function backlogCardHTML(r) {
-  const isNewObjective = r['Objective Type'] === 'New (proposed)';
-  const tsDate = r.Timestamp ? parseSheetTimestamp(r.Timestamp) : null;
-  const tsRel  = tsDate ? relativeTime(tsDate.getTime()) : '';
-  const whyText = whyPreview(r.Why);
-
-  return `
-    <div class="detail-card backlog-card">
-      <div class="detail-head">
-        <div class="detail-titlebox">
-          ${r.Objective ? `<div class="detail-objective">${escapeHtml(r.Objective)}${isNewObjective ? '<span class="objective-type-flag">new objective</span>' : ''}</div>` : ''}
-          <h3 class="detail-title">${escapeHtml(r.What || '(untitled)')}</h3>
-          <div class="detail-why">${whyText}</div>
-          <div class="detail-meta">
-            ${r.Submitter ? `<span>${escapeHtml(r.Submitter)}</span>` : ''}
-            ${tsRel ? `<span title="${escapeAttr(r.Timestamp)}">· submitted ${escapeHtml(tsRel)}</span>` : (r.Timestamp ? `<span>· ${escapeHtml(r.Timestamp)}</span>` : '')}
-          </div>
-        </div>
-        <div class="detail-head-actions">
-          ${statusPill(r.Status)}
-          <span class="detail-toggle">+</span>
-        </div>
-      </div>
-      <div class="detail-body">
-        ${fieldOrPlaceholder('Why', r.Why)}
-        ${fieldOrPlaceholder('How', r.How)}
-        ${r['Reviewer Notes'] ? `<h4>Reviewer notes</h4><p>${escapeHtml(r['Reviewer Notes'])}</p>` : ''}
-      </div>
-    </div>
-  `;
-}
-
-// Sheet timestamps come as "yyyy-MM-dd HH:mm:ss" strings — parse safely
-function parseSheetTimestamp(s) {
-  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
-  if (!m) return null;
-  return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
 }
 
 function firstUrl(cell) {
@@ -717,7 +667,8 @@ function statusClass(status) {
   const s = String(status).toLowerCase();
   if (/ship|done|launch|complete|live/.test(s))         return 'is-shipped';
   if (/progress|doing|building|wip|develop/.test(s))     return 'is-progress';
-  if (/discov|explore|research|backlog|todo|planning/.test(s)) return 'is-discovery';
+  if (/^backlog$/.test(s))                               return 'is-backlog';
+  if (/discov|explore|research|todo|planning/.test(s))   return 'is-discovery';
   if (/block|stuck|hold|paus/.test(s))                   return 'is-blocked';
   return '';
 }
@@ -734,12 +685,12 @@ function bindCardClicks(scope) {
 }
 
 // ─── Detail modal (initiative) ──────────────────────────────────────────
-// Stakeholders see this when they click any card in Timeline. For sheet rows
-// (What&Why) it's an editable form with a single Save at the bottom; for
-// backlog rows (`_isBacklog`) it falls back to a read-only summary.
+// Stakeholders see this when they click any card in Timeline. Editors get
+// an editable form with a single Save at the bottom; non-editors get a
+// read-only summary of the same row.
 
 const MONTH_NAMES_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const STATUS_OPTIONS    = ['Discovery','Doing','In review','Blocked','Shipped'];
+const STATUS_OPTIONS    = ['Backlog','Discovery','Doing','In review','Blocked','Shipped'];
 // Track open card so the Save handler can diff against it
 let CURRENT_DETAIL_ROW = null;
 
@@ -751,8 +702,7 @@ function isEditorViewer() {
 function openDetailModal(r) {
   CURRENT_DETAIL_ROW = r;
   const protoUrl = firstUrl(r.Prototype);
-  const isBacklog = !!r._isBacklog;
-  const canEdit = !isBacklog && isEditorViewer();
+  const canEdit = isEditorViewer();
 
   document.getElementById('detailModalTitle').textContent = r.What || '(no title)';
   document.getElementById('detailModalBody').innerHTML = canEdit
@@ -771,7 +721,7 @@ function closeDetailModal() {
   CURRENT_DETAIL_ROW = null;
 }
 
-// Read-only view — used for backlog cards surfaced in the unscheduled column.
+// Read-only view — used for non-editors.
 function renderDetailReadonly(r, protoUrl) {
   return `
     <div class="detail-modal-meta">
@@ -780,7 +730,6 @@ function renderDetailReadonly(r, protoUrl) {
         ${statusPill(r.Status)}
         ${r.Who  ? `<span class="owner-chip-static">${escapeHtml(r.Who)}</span>`  : `<span class="meta-empty">no owner</span>`}
         ${r.When ? `<span class="meta-when">${escapeHtml(r.When)}</span>`         : `<span class="meta-empty">no horizon</span>`}
-        <span class="meta-empty">backlog · read-only here</span>
       </div>
       ${protoUrl ? `<a class="btn btn-primary detail-modal-cta" href="${escapeAttr(protoUrl)}" target="_blank" rel="noopener">View prototype ↗</a>` : ''}
     </div>
@@ -1330,8 +1279,9 @@ async function handleSubmit(e) {
   if (CONFIG.USE_MOCK) {
     console.log('[MOCK] Would POST:', body);
     resetSubmitForm();
+    closeSubmitModal();
     celebrateSubmit();
-    toast('Mock submit: row would be appended to Backlog');
+    toast('Mock submit: row would be appended to What&Why with Status=Backlog');
     return;
   }
 
@@ -1341,13 +1291,14 @@ async function handleSubmit(e) {
     const data = await jsonpCall({ action: 'submit', ...body });
     if (!data.ok) throw new Error(data.error || 'submit failed');
     resetSubmitForm();
+    closeSubmitModal();
     celebrateSubmit();
-    toast(`Idea submitted (row #${data.rowNumber} in Backlog tab). Thanks!`);
-    fetchData(true); // force-refresh so the new backlog row appears immediately
+    toast(`Idea submitted (row #${data.rowKey || data.rowNumber}). Thanks!`);
+    fetchData(true); // force-refresh so the new row appears in Timeline immediately
   } catch (err) {
     showFormError(err.message);
   } finally {
-    btn.disabled = false; btn.textContent = 'Submit to backlog';
+    btn.disabled = false; btn.textContent = 'Submit to roadmap';
   }
 }
 

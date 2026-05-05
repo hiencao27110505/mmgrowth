@@ -45,7 +45,6 @@
       <!-- View switcher -->
       <nav class="tabs">
         <button class="tab is-active" data-view="timeline">Timeline</button>
-        <button class="tab" data-view="backlog">Backlog <span id="backlog-count" class="tab-count">0</span></button>
         <button class="tab" data-view="insights">AI Insights</button>
       </nav>
 
@@ -73,15 +72,55 @@
         </div>
         <div id="timelineColumns" class="timeline"></div>
       </section>
-      <section id="view-backlog"  class="view" hidden>
-        <div class="backlog-form-wrapper">
-        <div class="backlog-form-card">
-          <div class="backlog-form-head">
-            <h2 class="backlog-form-title">Submit an idea</h2>
-            <p class="backlog-form-sub">Propose a new initiative for this team's roadmap. Goes into the Backlog tab below.</p>
+      <section id="view-insights" class="view" hidden>
+        <div class="insights-controls">
+          <div class="mode-toggle" role="radiogroup" aria-label="Synthesis mode">
+            <button class="mode-pill is-active" data-mode="stakeholder">For stakeholders</button>
+            <button class="mode-pill" data-mode="operational">Operational risks</button>
           </div>
+          <div class="insights-actions">
+            <button id="generateBtn" class="btn btn-primary">Generate synthesis</button>
+            <span id="synthesisMeta" class="updated-label"></span>
+          </div>
+        </div>
+        <div id="insightsBody" class="insights-body"></div>
+      </section>
 
+      <div id="emptyState" class="empty-state" hidden>
+        <p>Không có dữ liệu phù hợp.</p>
+      </div>
+    </main>
+
+    <footer class="footer page-wrap">
+      <span>Data source: Google Sheet "What&amp;Why" · auto-refreshed on reload</span>
+    </footer>
+  </div>
+
+  <!-- ─── Initiative detail modal (opens on Timeline card click) ──────── -->
+  <div id="detailModal" class="modal" hidden>
+    <div class="modal-backdrop" data-detail-close></div>
+    <div class="modal-card detail-modal-card" role="dialog" aria-labelledby="detailModalTitle">
+      <div class="modal-head">
+        <h2 id="detailModalTitle">Initiative</h2>
+        <button class="btn btn-link" data-detail-close>×</button>
+      </div>
+      <div id="detailModalBody" class="detail-modal-body"></div>
+    </div>
+  </div>
+
+  <!-- ─── Submit-an-idea modal (opens from header button) ──────────────── -->
+  <div id="submitModal" class="modal" hidden>
+    <div class="modal-backdrop" data-submit-close></div>
+    <div class="modal-card submit-modal-card" role="dialog" aria-labelledby="submitModalTitle">
+      <div class="modal-head">
+        <h2 id="submitModalTitle">Submit an idea</h2>
+        <button class="btn btn-link" data-submit-close>×</button>
+      </div>
+      <div class="submit-modal-body">
+        <div class="submit-form-wrapper">
           <form id="submitForm" class="form backlog-form">
+            <p class="submit-form-sub">Propose a new initiative. It goes straight into the roadmap with status <strong>Backlog</strong> for the PM to triage.</p>
+
             <div class="form-grid">
               <label class="field">
                 <span class="field-label">Strategic Objective <span class="req">*</span></span>
@@ -117,7 +156,10 @@
 
             <div class="backlog-form-foot">
               <span class="form-meta-inline">Submitting as <strong id="submitterEmail"></strong></span>
-              <button type="submit" class="btn btn-primary" id="submitFormBtn">Submit to backlog</button>
+              <div class="submit-form-actions">
+                <button type="button" class="btn btn-link" data-submit-close>Cancel</button>
+                <button type="submit" class="btn btn-primary" id="submitFormBtn">Submit to roadmap</button>
+              </div>
             </div>
           </form>
         </div>
@@ -148,47 +190,7 @@
 
           <p class="tips-footer">Brief like you're explaining to your boss in 60 seconds.</p>
         </aside>
-        </div>
-
-        <div class="backlog-list-head">
-          <h2 class="backlog-list-title">Submissions</h2>
-          <span class="backlog-list-sub">Newest first · auto-refreshes after each submit</span>
-        </div>
-        <div id="backlogCardsList"></div>
-      </section>
-      <section id="view-insights" class="view" hidden>
-        <div class="insights-controls">
-          <div class="mode-toggle" role="radiogroup" aria-label="Synthesis mode">
-            <button class="mode-pill is-active" data-mode="stakeholder">For stakeholders</button>
-            <button class="mode-pill" data-mode="operational">Operational risks</button>
-          </div>
-          <div class="insights-actions">
-            <button id="generateBtn" class="btn btn-primary">Generate synthesis</button>
-            <span id="synthesisMeta" class="updated-label"></span>
-          </div>
-        </div>
-        <div id="insightsBody" class="insights-body"></div>
-      </section>
-
-      <div id="emptyState" class="empty-state" hidden>
-        <p>Không có dữ liệu phù hợp.</p>
       </div>
-    </main>
-
-    <footer class="footer page-wrap">
-      <span>Data source: Google Sheet "What&amp;Why" · auto-refreshed on reload</span>
-    </footer>
-  </div>
-
-  <!-- ─── Initiative detail modal (opens on Timeline card click) ──────── -->
-  <div id="detailModal" class="modal" hidden>
-    <div class="modal-backdrop" data-detail-close></div>
-    <div class="modal-card detail-modal-card" role="dialog" aria-labelledby="detailModalTitle">
-      <div class="modal-head">
-        <h2 id="detailModalTitle">Initiative</h2>
-        <button class="btn btn-link" data-detail-close>×</button>
-      </div>
-      <div id="detailModalBody" class="detail-modal-body"></div>
     </div>
   </div>
 

@@ -394,6 +394,7 @@ a:hover { text-decoration: underline; }
 .card-status.is-progress { color: var(--blue); }
 .card-status.is-discovery{ color: var(--orange); }
 .card-status.is-blocked  { color: var(--red); }
+.card-status.is-backlog  { color: var(--momo); }
 .card-foot-text { color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; }
 .card-foot-sep  { color: var(--ink-3); opacity: 0.4; }
 .card-source-tag {
@@ -628,34 +629,33 @@ a:hover { text-decoration: underline; }
   color: var(--ink-3); font-size: 14px;
 }
 
-/* ─── Backlog: in-tab submit form + writing tips side-by-side ────────── */
-.backlog-form-wrapper {
-  display: grid;
-  grid-template-columns: 1fr 320px;
-  gap: 16px;
-  margin-bottom: 28px;
+/* ─── Submit-an-idea modal (Timeline header → popup) ─────────────────── */
+.submit-modal-card { max-width: 920px; }
+.submit-modal-body {
+  padding: 16px 24px 24px;
+  display: grid; gap: 20px;
+  grid-template-columns: minmax(0, 1fr) 300px;
   align-items: start;
 }
-@media (max-width: 880px) {
-  .backlog-form-wrapper { grid-template-columns: 1fr; }
+@media (max-width: 820px) {
+  .submit-modal-body { grid-template-columns: 1fr; }
 }
-
-.backlog-form-card {
-  background: var(--white); border: 1px solid var(--border);
-  border-left: 3px solid var(--momo);
-  border-radius: var(--radius);
-  padding: 24px;
+.submit-form-wrapper { min-width: 0; }
+.submit-form-sub {
+  font-size: 13px; color: var(--ink-3); margin: 0 0 16px;
 }
+.submit-form-actions { display: flex; gap: 8px; align-items: center; }
 
-/* Writing-tips panel */
+/* Writing-tips panel — now lives inside the submit modal */
 .writing-tips-card {
-  background: var(--white); border: 1px solid var(--border);
+  background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 20px 22px;
-  position: sticky; top: 16px;
+  position: sticky; top: 0;
+  max-height: 70vh; overflow-y: auto;
 }
-@media (max-width: 880px) {
-  .writing-tips-card { position: static; }
+@media (max-width: 820px) {
+  .writing-tips-card { position: static; max-height: none; }
 }
 .tips-title {
   font-family: 'DM Serif Display', serif;
