@@ -139,31 +139,8 @@ function bindUI() {
   const fOther = document.getElementById('fObjectiveOther');
   if (fOther) fOther.addEventListener('input', updateSubmitGate);
 
-  // Timeline filters — event-delegated so the listener survives any DOM
-  // rebuild of the inner <select>s and runs even if bindUI fires before
-  // the elements are populated.
-  const filterBar = document.getElementById('timelineFilters');
-  if (filterBar) {
-    const FILTER_KEY = { filterOwner: 'owner', filterStatus: 'status', filterQuality: 'quality' };
-    filterBar.addEventListener('change', (e) => {
-      const key = FILTER_KEY[e.target && e.target.id];
-      if (!key) return;
-      STATE.filters[key] = e.target.value;
-      updateClearFiltersBtn();
-      renderTimeline();
-    });
-    filterBar.addEventListener('click', (e) => {
-      if (e.target && e.target.id === 'clearFiltersBtn') {
-        STATE.filters = { owner: '', status: '', quality: '' };
-        ['filterOwner', 'filterStatus', 'filterQuality'].forEach(id => {
-          const el = document.getElementById(id);
-          if (el) el.value = '';
-        });
-        updateClearFiltersBtn();
-        renderTimeline();
-      }
-    });
-  }
+  // (Timeline filter listeners attached inside populateTimelineFilters —
+  // they need to survive each rebuild of the <select> options.)
 
   // Detail modal close
   document.querySelectorAll('[data-detail-close]').forEach(el => {
@@ -374,6 +351,13 @@ function applyTimelineFilters(rows) {
   });
 }
 
+function onFilterChange(key, value) {
+  console.log('[filter]', key, '→', value);
+  STATE.filters[key] = value;
+  updateClearFiltersBtn();
+  renderTimeline();
+}
+
 function populateTimelineFilters() {
   const owners = Array.from(new Set(
     STATE.rows.map(r => (r.Who || '').trim()).filter(Boolean)
@@ -384,6 +368,7 @@ function populateTimelineFilters() {
 
   const ownerSel  = document.getElementById('filterOwner');
   const statusSel = document.getElementById('filterStatus');
+  const qSel      = document.getElementById('filterQuality');
   if (ownerSel) {
     const cur = STATE.filters.owner;
     ownerSel.innerHTML = '<option value="">All</option>' +
@@ -391,6 +376,9 @@ function populateTimelineFilters() {
     // Keep selection if the current owner still exists, otherwise reset.
     if (owners.includes(cur)) ownerSel.value = cur;
     else { ownerSel.value = ''; STATE.filters.owner = ''; }
+    // Direct property assignment — replaces any prior handler, immune to
+    // delegation/timing issues from the previous bindUI approach.
+    ownerSel.onchange = (e) => onFilterChange('owner', e.target.value);
   }
   if (statusSel) {
     const cur = STATE.filters.status;
@@ -398,9 +386,21 @@ function populateTimelineFilters() {
       statuses.map(s => `<option value="${escapeAttr(s)}">${escapeHtml(s)}</option>`).join('');
     if (statuses.includes(cur)) statusSel.value = cur;
     else { statusSel.value = ''; STATE.filters.status = ''; }
+    statusSel.onchange = (e) => onFilterChange('status', e.target.value);
   }
-  const qSel = document.getElementById('filterQuality');
-  if (qSel) qSel.value = STATE.filters.quality;
+  if (qSel) {
+    qSel.value = STATE.filters.quality;
+    qSel.onchange = (e) => onFilterChange('quality', e.target.value);
+  }
+  const clearBtn = document.getElementById('clearFiltersBtn');
+  if (clearBtn) clearBtn.onclick = () => {
+    STATE.filters = { owner: '', status: '', quality: '' };
+    if (ownerSel)  ownerSel.value  = '';
+    if (statusSel) statusSel.value = '';
+    if (qSel)      qSel.value      = '';
+    updateClearFiltersBtn();
+    renderTimeline();
+  };
   updateClearFiltersBtn();
 }
 
