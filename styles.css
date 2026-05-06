@@ -881,6 +881,18 @@ a:hover { text-decoration: underline; }
   outline: none; border-color: var(--momo);
   box-shadow: 0 0 0 2px var(--momo-light);
 }
+.detail-edit-form input.has-error,
+.detail-edit-form select.has-error,
+.detail-edit-form textarea.has-error {
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.12);
+}
+.detail-edit-form .form-error {
+  background: #fce8e8; color: var(--red);
+  border: 1px solid #f5c2c2; border-radius: 6px;
+  padding: 10px 14px; font-size: 13px; line-height: 1.5;
+  margin: 4px 0 12px;
+}
 
 .form-grid-2 {
   display: grid; gap: 14px; grid-template-columns: 1fr 1fr;
@@ -888,9 +900,6 @@ a:hover { text-decoration: underline; }
 @media (max-width: 560px) {
   .form-grid-2 { grid-template-columns: 1fr; }
 }
-
-.when-pair { display: flex; gap: 8px; }
-.when-pair select { flex: 1; }
 
 .detail-edit-foot {
   display: flex; justify-content: space-between; align-items: center;

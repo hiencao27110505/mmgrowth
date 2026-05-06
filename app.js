@@ -767,27 +767,24 @@ function renderDetailEditable(r, protoUrl) {
     .map(s => `<option value="${escapeAttr(s)}"${s === (r.Status || '').trim() ? ' selected' : ''}>${s ? escapeHtml(s) : '— no status —'}</option>`)
     .join('');
 
-  // When → split current value into month + year for the two selects
+  // When → year is fixed at 2026, only month is selectable
   const parsed = parseWhenToMonth(r.When);
-  const curYear  = parsed ? parsed.year  : '';
   const curMonth = parsed ? parsed.month : '';
-  const today = new Date();
-  const yearStart = today.getFullYear() - 1;
-  const yearEnd   = today.getFullYear() + 2;
-  const yearOpts = [''].concat(
-    Array.from({ length: yearEnd - yearStart + 1 }, (_, i) => yearStart + i)
-  ).map(y => `<option value="${y}"${String(y) === String(curYear) ? ' selected' : ''}>${y === '' ? '— year —' : y}</option>`).join('');
-  const monthOpts = [''].concat(MONTH_NAMES_SHORT.map((m, i) => ({ name: m, num: i + 1 })))
-    .map(opt => {
-      if (opt === '') return `<option value="">— month —</option>`;
-      return `<option value="${opt.num}"${String(opt.num) === String(curMonth) ? ' selected' : ''}>${opt.name}</option>`;
-    }).join('');
+  const monthOpts = [`<option value="">— No month —</option>`].concat(
+    MONTH_NAMES_SHORT.map((name, i) => {
+      const num = i + 1;
+      const sel = String(num) === String(curMonth) ? ' selected' : '';
+      return `<option value="${num}"${sel}>${name} 2026</option>`;
+    })
+  ).join('');
 
-  // Datalist for owner — autocompletes from existing names without forcing
-  // the user into a fixed enum (frees-form names like "Hân + Linh" still work)
+  // Owner dropdown — pulled from existing distinct values in the sheet
   const ownerSet = new Set(STATE.rows.map(x => (x.Who || '').trim()).filter(Boolean));
-  const ownerListOpts = Array.from(ownerSet).sort((a,b) => a.localeCompare(b))
-    .map(o => `<option value="${escapeAttr(o)}"></option>`).join('');
+  const curOwner = (r.Who || '').trim();
+  if (curOwner) ownerSet.add(curOwner);
+  const ownerOpts = ['', ...Array.from(ownerSet).sort((a, b) => a.localeCompare(b))]
+    .map(o => `<option value="${escapeAttr(o)}"${o === curOwner ? ' selected' : ''}>${o ? escapeHtml(o) : '— No owner —'}</option>`)
+    .join('');
 
   return `
     <form id="detailEditForm" class="detail-edit-form" data-row-key="${escapeAttr(r['#'] || '')}">
@@ -807,37 +804,37 @@ function renderDetailEditable(r, protoUrl) {
 
       <label class="field">
         <span class="field-label">What</span>
-        <textarea name="What" rows="2">${escapeHtml(r.What || '')}</textarea>
+        <textarea name="What" rows="2"
+          placeholder="Verb + noun + outcome — fits one line. e.g. Add NFC fallback to eKYC scan">${escapeHtml(r.What || '')}</textarea>
       </label>
 
       <label class="field">
         <span class="field-label">Why</span>
-        <textarea name="Why" rows="3">${escapeHtml(r.Why || '')}</textarea>
+        <textarea name="Why" rows="3"
+          placeholder="The customer problem, quantified. e.g. 30% of users abandon eKYC after camera scan fails — costs 200 signups/day.">${escapeHtml(r.Why || '')}</textarea>
       </label>
 
       <label class="field">
         <span class="field-label">How</span>
-        <textarea name="How" rows="3">${escapeHtml(r.How || '')}</textarea>
+        <textarea name="How" rows="3"
+          placeholder="Approach + MVP scope. e.g. Detect NFC-capable phones, offer NFC as primary path. MVP: Android only, iOS in v2.">${escapeHtml(r.How || '')}</textarea>
       </label>
 
       <label class="field">
         <span class="field-label">User flow</span>
-        <textarea name="User Flow" rows="2">${escapeHtml(r['User Flow'] || '')}</textarea>
+        <textarea name="User Flow" rows="3"
+          placeholder="Step-by-step user flow — used as a prompt to generate the prototype. e.g. 1) User opens MoMo → 2) Taps eKYC → 3) System detects NFC chip → 4) Prompts to tap CCCD on back of phone → 5) Reads chip → 6) Confirms identity → 7) Returns to home with verified badge">${escapeHtml(r['User Flow'] || '')}</textarea>
       </label>
 
       <div class="form-grid-2">
         <label class="field">
           <span class="field-label">Owner</span>
-          <input name="Who" type="text" list="ownerSuggestions" value="${escapeAttr(r.Who || '')}" placeholder="e.g. Hân" />
-          <datalist id="ownerSuggestions">${ownerListOpts}</datalist>
+          <select name="Who">${ownerOpts}</select>
         </label>
-        <div class="field">
+        <label class="field">
           <span class="field-label">When (ETA)</span>
-          <div class="when-pair">
-            <select name="WhenMonth">${monthOpts}</select>
-            <select name="WhenYear">${yearOpts}</select>
-          </div>
-        </div>
+          <select name="WhenMonth">${monthOpts}</select>
+        </label>
       </div>
 
       <label class="field">
@@ -870,14 +867,19 @@ function wireDetailEditHandlers() {
   const saveBtn = document.getElementById('detailSaveBtn');
   const meta    = document.getElementById('detailEditDirty');
 
-  // Re-evaluate dirty state on any input/change
-  function refreshDirty() {
+  // Re-evaluate dirty state on any input/change. Also clears stale error
+  // highlights from a previous failed-validation submit so the user gets
+  // immediate feedback that they're addressing the issue.
+  function refreshDirty(e) {
     const changes = collectDetailChanges();
     const n = Object.keys(changes).length;
     saveBtn.disabled = n === 0;
     meta.textContent = n === 0
       ? 'No changes yet'
       : `${n} change${n > 1 ? 's' : ''} pending`;
+    // Clear has-error on the field being edited
+    if (e && e.target && e.target.classList) e.target.classList.remove('has-error');
+    document.getElementById('detailEditError').hidden = true;
   }
   form.addEventListener('input', refreshDirty);
   form.addEventListener('change', refreshDirty);
@@ -902,11 +904,9 @@ function collectDetailChanges() {
     if (newVal !== oldVal) changes[name] = newVal;
   });
 
-  // When: combine month + year selects → "MMM YYYY" or empty if cleared
+  // When: month-only (year fixed at 2026) → "Mmm 2026" or empty if cleared
   const m = (fd.get('WhenMonth') || '').toString();
-  const y = (fd.get('WhenYear')  || '').toString();
-  let newWhen = '';
-  if (m && y) newWhen = `${MONTH_NAMES_SHORT[parseInt(m, 10) - 1]} ${y}`;
+  const newWhen = m ? `${MONTH_NAMES_SHORT[parseInt(m, 10) - 1]} 2026` : '';
   const oldWhen = ((r.When || '') + '').trim();
   if (newWhen !== oldWhen) changes['When'] = newWhen;
 
@@ -921,14 +921,52 @@ async function handleDetailSave(e) {
   const changes = collectDetailChanges();
   if (Object.keys(changes).length === 0) return;
 
-  // Cross-field validation: When requires both month AND year, or both empty
-  const form = document.getElementById('detailEditForm');
-  const fd = new FormData(form);
-  const m = (fd.get('WhenMonth') || '').toString();
-  const y = (fd.get('WhenYear')  || '').toString();
-  if ((m && !y) || (!m && y)) {
-    showDetailEditError('Pick both month and year, or leave both empty.');
-    return;
+  // Writing-rules validation — only for What/Why/How fields the editor
+  // actually changed. Don't reject saves for legacy text the editor isn't
+  // touching, but DO enforce the rules on any new writing.
+  const touched = ['What', 'Why', 'How'].filter(k => k in changes);
+  if (touched.length > 0) {
+    const newValues = {
+      what: 'What' in changes ? changes['What'] : (r.What || ''),
+      why:  'Why'  in changes ? changes['Why']  : (r.Why  || ''),
+      how:  'How'  in changes ? changes['How']  : (r.How  || '')
+    };
+    const reasons = [];
+    const failingFields = new Set();
+
+    touched.forEach(label => {
+      const key = label.toLowerCase();
+      const value = newValues[key];
+      // Anti-cheat / real-text integrity
+      const cfg = INTEGRITY_CHECKS[key];
+      const integrity = validateRealText(value, cfg.minDistinctWords);
+      if (!integrity.ok) {
+        reasons.push(`${label}: ${integrity.reason}`);
+        failingFields.add(label);
+      }
+      // Amazonian writing rules
+      QUALITY_CHECKS[key].forEach(rule => {
+        if (!rule.test(value)) {
+          reasons.push(`${label}: ${rule.label.replace(/—.*$/, '').trim()}`);
+          failingFields.add(label);
+        }
+      });
+    });
+
+    if (reasons.length > 0) {
+      showDetailEditErrorList(reasons);
+      // Highlight failing textareas + scroll to the first one
+      failingFields.forEach(label => {
+        const el = document.querySelector(`#detailEditForm [name="${label}"]`);
+        if (el) el.classList.add('has-error');
+      });
+      const first = document.querySelector('#detailEditForm .has-error');
+      if (first) {
+        first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(() => first.focus({ preventScroll: true }), 350);
+      }
+      return;
+    }
   }
 
   const rowKey = r['#'];
@@ -976,6 +1014,18 @@ function showDetailEditError(msg) {
   const el = document.getElementById('detailEditError');
   if (!el) return;
   el.textContent = msg;
+  el.hidden = false;
+}
+
+// Bullet-list version for writing-rule failures across multiple fields.
+function showDetailEditErrorList(reasons) {
+  const el = document.getElementById('detailEditError');
+  if (!el) return;
+  el.innerHTML =
+    '<strong>Writing rules not met:</strong>' +
+    '<ul style="margin:6px 0 0 18px;padding:0">' +
+      reasons.map(r => `<li>${escapeHtml(r)}</li>`).join('') +
+    '</ul>';
   el.hidden = false;
 }
 
