@@ -117,13 +117,21 @@
         <button class="btn btn-link" data-submit-close>×</button>
       </div>
       <form id="submitForm" class="idea-form">
-        <div class="idea-field">
-          <label class="idea-label" for="fObjective">Objective</label>
-          <input id="fObjective" name="fObjective" type="text"
-                 list="objectiveSuggestions"
-                 placeholder="Pick existing or type new — e.g. Reduce eKYC drop-off"
-                 autocomplete="off" required />
-          <datalist id="objectiveSuggestions"></datalist>
+        <div class="idea-field-row">
+          <div class="idea-field" style="flex: 2;">
+            <label class="idea-label" for="fObjective">Objective</label>
+            <input id="fObjective" name="fObjective" type="text"
+                   list="objectiveSuggestions"
+                   placeholder="Pick existing or type new — e.g. Reduce eKYC drop-off"
+                   autocomplete="off" required />
+            <datalist id="objectiveSuggestions"></datalist>
+          </div>
+          <div class="idea-field" style="flex: 1;">
+            <label class="idea-label" for="fWhen">When <span class="idea-label-hint">· optional</span></label>
+            <select id="fWhen" name="fWhen">
+              <option value="">— No month —</option>
+            </select>
+          </div>
         </div>
 
         <div class="idea-field" data-field="what">
@@ -162,13 +170,6 @@
         <div class="idea-field">
           <label class="idea-label" for="fUserFlow">User flow <span class="idea-label-hint">· optional, used to generate prototype</span></label>
           <textarea id="fUserFlow" rows="4" placeholder="e.g. 1) Open MoMo → 2) Tap eKYC → 3) Detect NFC chip → 4) Prompt to tap CCCD on back of phone → 5) Read chip → 6) Confirm identity → 7) Return to home with verified badge"></textarea>
-        </div>
-
-        <div class="idea-field">
-          <label class="idea-label" for="fWhen">When <span class="idea-label-hint">· optional</span></label>
-          <select id="fWhen" name="fWhen">
-            <option value="">— No month —</option>
-          </select>
         </div>
 
         <div id="formError" class="form-error" hidden></div>
