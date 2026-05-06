@@ -18,7 +18,7 @@ const STATE = {
   objectives: [],
   view: 'timeline',
   fetchedAt: 0,
-  filters: { owner: '', status: '', quality: '' }, // Timeline filters; '' = no filter
+  filters: { objective: '', owner: '', status: '', quality: '' }, // Timeline filters; '' = no filter
   synthesis: {
     stakeholder: { text: '', generatedAt: 0 },
     operational: { text: '', generatedAt: 0 }
@@ -370,6 +370,7 @@ function renderMetrics() {
 function applyTimelineFilters(rows) {
   const f = STATE.filters;
   return rows.filter(r => {
+    if (f.objective && (r.Objective || '').trim() !== f.objective) return false;
     if (f.owner  && (r.Who    || '').trim() !== f.owner)  return false;
     if (f.status && (r.Status || '').trim() !== f.status) return false;
     if (f.quality === 'complete' && missingFields(r).length > 0)  return false;
@@ -392,9 +393,18 @@ function populateTimelineFilters() {
     STATE.rows.map(r => (r.Status || '').trim()).filter(Boolean)
   )).sort((a, b) => a.localeCompare(b));
 
+  const objectiveSel = document.getElementById('filterObjective');
   const ownerSel  = document.getElementById('filterOwner');
   const statusSel = document.getElementById('filterStatus');
   const qSel      = document.getElementById('filterQuality');
+  if (objectiveSel) {
+    const cur = STATE.filters.objective;
+    objectiveSel.innerHTML = '<option value="">All</option>' +
+      STATE.objectives.map(o => `<option value="${escapeAttr(o)}">${escapeHtml(o)}</option>`).join('');
+    if (STATE.objectives.includes(cur)) objectiveSel.value = cur;
+    else { objectiveSel.value = ''; STATE.filters.objective = ''; }
+    objectiveSel.onchange = (e) => onFilterChange('objective', e.target.value);
+  }
   if (ownerSel) {
     const cur = STATE.filters.owner;
     ownerSel.innerHTML = '<option value="">All</option>' +
@@ -420,10 +430,11 @@ function populateTimelineFilters() {
   }
   const clearBtn = document.getElementById('clearFiltersBtn');
   if (clearBtn) clearBtn.onclick = () => {
-    STATE.filters = { owner: '', status: '', quality: '' };
-    if (ownerSel)  ownerSel.value  = '';
-    if (statusSel) statusSel.value = '';
-    if (qSel)      qSel.value      = '';
+    STATE.filters = { objective: '', owner: '', status: '', quality: '' };
+    if (objectiveSel) objectiveSel.value = '';
+    if (ownerSel)     ownerSel.value     = '';
+    if (statusSel)    statusSel.value    = '';
+    if (qSel)         qSel.value         = '';
     updateClearFiltersBtn();
     renderTimeline();
   };
@@ -432,7 +443,7 @@ function populateTimelineFilters() {
 
 function updateClearFiltersBtn() {
   const f = STATE.filters;
-  const hasAny = !!(f.owner || f.status || f.quality);
+  const hasAny = !!(f.objective || f.owner || f.status || f.quality);
   const btn = document.getElementById('clearFiltersBtn');
   if (btn) btn.hidden = !hasAny;
 }
@@ -465,7 +476,7 @@ function renderTimeline() {
 
   // Filter-count chip: how many cards survived the filter (only when active)
   const f = STATE.filters;
-  const hasAny = !!(f.owner || f.status || f.quality);
+  const hasAny = !!(f.objective || f.owner || f.status || f.quality);
   const countEl = document.getElementById('filterCount');
   if (countEl) {
     countEl.hidden = !hasAny;
