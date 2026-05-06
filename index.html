@@ -131,10 +131,10 @@
 
         <div class="idea-field" data-field="what">
           <label class="idea-label" for="fWhat">What</label>
-          <p class="idea-hint">One sentence: <em>"We will [verb] [noun] so that [outcome]."</em> Skip vague verbs and marketing fluff.</p>
-          <textarea id="fWhat" rows="2" required placeholder="The proposed initiative, in one sentence."></textarea>
+          <p class="idea-hint">3–5 words. Just the initiative title — e.g. <em>"NFC fallback for eKYC"</em>.</p>
+          <textarea id="fWhat" rows="1" required placeholder="e.g. NFC fallback for eKYC"></textarea>
           <div class="idea-meta">
-            <span class="idea-counter" data-counter="what">0 / 40 chars</span>
+            <span class="idea-counter" data-counter="what">0 / 5 words</span>
             <button type="button" class="idea-rules-toggle" data-rules-for="what" aria-expanded="false">
               <span class="rules-icon" aria-hidden="true">○</span>
               <span class="rules-label" data-rules-label-for="what">writing rules</span>
@@ -172,6 +172,20 @@
             </button>
           </div>
           <ul class="quality-list" id="checkHow" hidden></ul>
+        </div>
+
+        <div class="idea-field">
+          <label class="idea-label" for="fWhen">When (ETA)</label>
+          <p class="idea-hint">Target month. Leave empty if not yet planned.</p>
+          <select id="fWhen" name="fWhen">
+            <option value="">— No month —</option>
+          </select>
+        </div>
+
+        <div class="idea-field">
+          <label class="idea-label" for="fUserFlow">User flow</label>
+          <p class="idea-hint">Step-by-step user flow — used as a prompt to generate the prototype.</p>
+          <textarea id="fUserFlow" rows="3" placeholder="e.g. 1) User opens MoMo → 2) Taps eKYC → 3) System detects NFC chip → 4) Prompts to tap CCCD on back of phone → 5) Reads chip → 6) Confirms identity → 7) Returns to home with verified badge"></textarea>
         </div>
 
         <div id="formError" class="form-error" hidden></div>

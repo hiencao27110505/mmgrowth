@@ -644,12 +644,27 @@ function openSubmitModal() {
   if (!modal) return;
   modal.hidden = false;
   document.body.style.overflow = 'hidden';
+  populateSubmitWhenDropdown();
   // Reset any stale error highlights from a previous attempt
   resetSubmitForm();
   setTimeout(() => {
     const sel = document.getElementById('fObjective');
     if (sel) sel.focus();
   }, 30);
+}
+
+// Fill the "When" dropdown in the submit modal with the 12 months of 2026,
+// matching the detail-edit form's month picker.
+function populateSubmitWhenDropdown() {
+  const sel = document.getElementById('fWhen');
+  if (!sel) return;
+  if (sel.options.length > 1) return; // already populated
+  MONTH_NAMES_SHORT.forEach((name, i) => {
+    const opt = document.createElement('option');
+    opt.value = String(i + 1);
+    opt.textContent = `${name} 2026`;
+    sel.appendChild(opt);
+  });
 }
 
 function closeSubmitModal() {
@@ -1128,16 +1143,17 @@ function validateRealText(s, minDistinctWords) {
   return { ok: true };
 }
 
-// Per-field minimum distinct-word counts for the integrity check
+// Per-field minimum distinct-word counts for the integrity check.
+// `what` is title-style (3–5 words) so it skips the prose-oriented integrity
+// pass entirely — only the word-count rule in QUALITY_CHECKS applies.
 const INTEGRITY_CHECKS = {
-  what: { minDistinctWords: 6,  fieldLabel: 'What' },
   why:  { minDistinctWords: 10, fieldLabel: 'Why'  },
   how:  { minDistinctWords: 6,  fieldLabel: 'How'  }
 };
 
 function runIntegrityChecks() {
   const failures = [];
-  ['what', 'why', 'how'].forEach(field => {
+  ['why', 'how'].forEach(field => {
     const cap = field.charAt(0).toUpperCase() + field.slice(1);
     const value = (document.getElementById('f' + cap) || {}).value || '';
     const cfg = INTEGRITY_CHECKS[field];
@@ -1151,10 +1167,11 @@ function runIntegrityChecks() {
 // coaching checklist. Length floors stay here (clarity, not anti-cheat).
 const QUALITY_CHECKS = {
   what: [
-    { label: 'At least 40 characters — specific & complete',
-      test: s => s.trim().length >= 40 },
-    { label: 'Avoids vague verbs (improve, enhance, optimize, cải thiện…)',
-      test: s => s.trim().length > 0 && !/(improve|enhance|optimize|better|nicer|great|cải\s*thiện|tối\s*ưu|nâng\s*cao|tốt\s*hơn)/i.test(s) },
+    { label: '3–5 words — short, title-style',
+      test: s => {
+        const n = (s.trim().match(/\S+/g) || []).length;
+        return n >= 3 && n <= 5;
+      } },
     { label: 'No marketing fluff (amazing, world-class, seamless, magical, đột phá…)',
       test: s => s.trim().length > 0 && !/(amazing|awesome|world[-\s]?class|cutting[-\s]?edge|seamless|magical|revolutionary|innovative|delightful|game[-\s]?chang|next[-\s]?gen|state[-\s]?of[-\s]?the[-\s]?art|đột\s*phá|tuyệt\s*vời|đẳng\s*cấp|vượt\s*trội)/i.test(s) }
   ],
@@ -1214,16 +1231,25 @@ function renderChecklists() {
     const passed = QUALITY_CHECKS[field].filter(c => c.test(value)).length;
     const allPass = passed === total;
 
-    // Live char counter — turns green + ✓ when min is met
+    // Live counter — words for the title-style "what" field, chars otherwise.
     const counterEl = document.querySelector(`[data-counter="${field}"]`);
     if (counterEl) {
-      const min = FIELD_MIN_CHARS[field] || 0;
-      const len = value.trim().length;
-      const met = len >= min;
-      counterEl.classList.toggle('is-met', met);
-      counterEl.textContent = met
-        ? `${len} chars`
-        : `${len} / ${min} chars`;
+      if (field === 'what') {
+        const wordCount = (value.trim().match(/\S+/g) || []).length;
+        const met = wordCount >= 3 && wordCount <= 5;
+        counterEl.classList.toggle('is-met', met);
+        counterEl.textContent = wordCount === 0
+          ? `0 / 5 words`
+          : `${wordCount} word${wordCount === 1 ? '' : 's'}`;
+      } else {
+        const min = FIELD_MIN_CHARS[field] || 0;
+        const len = value.trim().length;
+        const met = len >= min;
+        counterEl.classList.toggle('is-met', met);
+        counterEl.textContent = met
+          ? `${len} chars`
+          : `${len} / ${min} chars`;
+      }
     }
 
     // Rules-toggle indicator (○ → ✓ green when all pass, ● orange when partial)
@@ -1366,13 +1392,19 @@ async function handleSubmit(e) {
   const objective = document.getElementById('fObjective').value.trim();
   const isNew = objective.length > 0 && !STATE.objectives.includes(objective);
 
+  // When → "Mmm 2026" string, matching the format used by detail-edit
+  const monthVal = (document.getElementById('fWhen') || {}).value || '';
+  const whenStr  = monthVal ? `${MONTH_NAMES_SHORT[parseInt(monthVal, 10) - 1]} 2026` : '';
+
   const body = {
     token: AUTH.getToken() || 'mock-token',
     objective,
     objectiveIsNew: isNew,
     what: document.getElementById('fWhat').value.trim(),
     why:  document.getElementById('fWhy').value.trim(),
-    how:  document.getElementById('fHow').value.trim()
+    how:  document.getElementById('fHow').value.trim(),
+    when: whenStr,
+    userFlow: (document.getElementById('fUserFlow') || {}).value.trim()
   };
 
   if (CONFIG.USE_MOCK) {
