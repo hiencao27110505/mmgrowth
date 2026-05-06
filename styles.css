@@ -696,7 +696,7 @@ a:hover { text-decoration: underline; }
 .idea-rules-toggle[aria-expanded="true"] .rules-caret { transform: rotate(90deg); }
 
 .idea-form .quality-list {
-  list-style: none; padding: 10px 12px; margin: 8px 0 0;
+  list-style: none; padding: 10px 12px; margin: 0 0 8px;
   background: var(--surface); border-radius: 6px;
   font-size: 12px; line-height: 1.6;
 }
