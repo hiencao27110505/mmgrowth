@@ -129,14 +129,32 @@ function bindUI() {
   // Form submit
   document.getElementById('submitForm').addEventListener('submit', handleSubmit);
 
-  // Clear stale error highlights as the user edits any field
-  ['fObjective', 'fWhat', 'fWhy', 'fHow'].forEach(id => {
+  // Live writing-rules checklist for What/Why/How
+  ['fWhat', 'fWhy', 'fHow'].forEach(id => {
     const el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener('input', () => {
-      el.classList.remove('has-error');
+    if (el) el.addEventListener('input', renderChecklists);
+  });
+
+  // Clear stale error highlight on the Objective field (no rules list)
+  const objEl = document.getElementById('fObjective');
+  if (objEl) {
+    objEl.addEventListener('input', () => {
+      objEl.classList.remove('has-error');
       const errEl = document.getElementById('formError');
       if (errEl) errEl.hidden = true;
+    });
+  }
+
+  // Rules-toggle buttons — collapse/expand the per-field writing-rules list
+  document.querySelectorAll('.idea-rules-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const field = btn.dataset.rulesFor;
+      const cap = field.charAt(0).toUpperCase() + field.slice(1);
+      const list = document.getElementById('check' + cap);
+      if (!list) return;
+      const open = btn.getAttribute('aria-expanded') === 'true';
+      btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+      list.hidden = open;
     });
   });
 
@@ -1180,8 +1198,6 @@ const QUALITY_CHECKS = {
   how: [
     { label: 'At least 40 characters — concrete approach',
       test: s => s.trim().length >= 40 },
-    { label: 'Mentions scope, MVP, or an alternative considered',
-      test: s => /(\bmvp\b|\bv1\b|\bv2\b|scope|phase|alternative|instead|trade[-\s]?off|fallback|out\s*of\s*scope|phạm\s*vi|giai\s*đoạn|lựa\s*chọn|thay\s*vì)/i.test(s) },
     { label: 'No corporate jargon (synergy, leverage, ecosystem, holistic, hệ sinh thái…)',
       test: s => s.trim().length > 0 && !/(synergy|leverage|ecosystem|holistic|paradigm|best[-\s]?in[-\s]?class|alignment|streamline|empower|robust\s+solution|move\s+the\s+needle|low[-\s]?hanging\s+fruit|bandwidth|circle\s+back|hệ\s*sinh\s*thái|cộng\s*hưởng|tối\s*ưu\s*hoá|toàn\s*diện)/i.test(s) }
   ]
@@ -1204,7 +1220,13 @@ function highlightFailingFields(failing) {
   ['what', 'why', 'how'].forEach(field => {
     const cap = field.charAt(0).toUpperCase() + field.slice(1);
     const input = document.getElementById('f' + cap);
-    if (failing.has(field) && input) input.classList.add('has-error');
+    const checklist = document.getElementById('check' + cap);
+    const toggle = document.querySelector(`[data-rules-for="${field}"]`);
+    if (!failing.has(field)) return;
+    if (input)     input.classList.add('has-error');
+    if (checklist) checklist.classList.add('show-failed');
+    // Auto-expand the rules list so the user can see exactly what failed
+    if (toggle && toggle.getAttribute('aria-expanded') !== 'true') toggle.click();
   });
   if (failing.has('objective')) {
     const obj = document.getElementById('fObjective');
@@ -1227,6 +1249,66 @@ function resetSubmitForm() {
   document.getElementById('submitForm').reset();
   document.getElementById('formError').hidden = true;
   document.querySelectorAll('#submitForm .has-error').forEach(el => el.classList.remove('has-error'));
+  document.querySelectorAll('.quality-list.show-failed').forEach(el => el.classList.remove('show-failed'));
+  // Collapse all rules toggles back to closed
+  document.querySelectorAll('.idea-rules-toggle[aria-expanded="true"]').forEach(t => {
+    t.setAttribute('aria-expanded', 'false');
+    const cap = t.dataset.rulesFor.charAt(0).toUpperCase() + t.dataset.rulesFor.slice(1);
+    const target = document.getElementById('check' + cap);
+    if (target) target.hidden = true;
+  });
+  renderChecklists();
+}
+
+// Live per-field writing-rules indicator. Renders the checklist (still hidden
+// behind the toggle until the user expands it) and updates the toggle's
+// indicator (○ → ● partial → ✓ all pass) plus its label ("2/3 rules met").
+function renderChecklists() {
+  // Any edit clears a stale error banner from a prior failed submit
+  const formErrEl = document.getElementById('formError');
+  if (formErrEl) formErrEl.hidden = true;
+
+  ['what', 'why', 'how'].forEach(field => {
+    const cap = field.charAt(0).toUpperCase() + field.slice(1);
+    const input = document.getElementById('f' + cap);
+    const container = document.getElementById('check' + cap);
+    if (!container || !input) return;
+    const value = input.value || '';
+
+    const rules = QUALITY_CHECKS[field];
+    const items = rules.map(c => {
+      const passed = c.test(value);
+      return `<li class="${passed ? 'is-passed' : ''}">
+        <span class="check-icon" aria-hidden="true">${passed ? '✓' : '○'}</span>
+        <span class="check-label">${escapeHtml(c.label)}</span>
+      </li>`;
+    }).join('');
+    container.innerHTML = items;
+
+    const passed = rules.filter(c => c.test(value)).length;
+    const total = rules.length;
+    const allPass = passed === total;
+
+    const toggleEl = document.querySelector(`[data-rules-for="${field}"]`);
+    if (toggleEl) {
+      toggleEl.classList.toggle('is-passing', allPass);
+      toggleEl.classList.toggle('is-failing', !allPass && passed > 0);
+      const labelEl = document.querySelector(`[data-rules-label-for="${field}"]`);
+      const iconEl = toggleEl.querySelector('.rules-icon');
+      if (iconEl) iconEl.textContent = allPass ? '✓' : (passed > 0 ? '●' : '○');
+      if (labelEl) {
+        labelEl.textContent = value.trim().length === 0
+          ? 'writing rules'
+          : `${passed}/${total} rules met`;
+      }
+    }
+
+    // Clear error highlight on the field once all its rules pass
+    if (allPass) {
+      input.classList.remove('has-error');
+      container.classList.remove('show-failed');
+    }
+  });
 }
 
 // Confetti celebration on successful submit. MoMo brand colors. Fires three

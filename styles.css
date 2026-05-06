@@ -671,6 +671,40 @@ a:hover { text-decoration: underline; }
   .idea-field-row { flex-direction: column; gap: 16px; }
 }
 
+/* Per-field "writing rules" toggle (collapsed by default) */
+.idea-rules-toggle {
+  background: transparent; border: 0; cursor: pointer;
+  font: inherit; font-size: 12px; color: var(--ink-3);
+  padding: 4px 0 0;
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: color 0.15s ease;
+}
+.idea-rules-toggle:hover { color: var(--ink); }
+.idea-rules-toggle .rules-icon { font-size: 13px; line-height: 1; }
+.idea-rules-toggle.is-passing,
+.idea-rules-toggle.is-passing .rules-icon { color: var(--green); }
+.idea-rules-toggle.is-failing .rules-icon { color: var(--orange); }
+.idea-rules-toggle .rules-caret { font-size: 9px; transition: transform 0.15s ease; }
+.idea-rules-toggle[aria-expanded="true"] .rules-caret { transform: rotate(90deg); }
+
+.idea-form .quality-list {
+  list-style: none; padding: 10px 12px; margin: 8px 0 0;
+  background: var(--surface); border-radius: 6px;
+  font-size: 12px; line-height: 1.6;
+}
+.idea-form .quality-list li {
+  display: flex; align-items: flex-start; gap: 8px;
+  color: var(--ink-3); padding: 2px 0;
+}
+.idea-form .quality-list li.is-passed { color: var(--green); }
+.idea-form .quality-list .check-icon {
+  flex-shrink: 0; font-size: 13px; line-height: 1.4; width: 14px;
+}
+.idea-form .quality-list.show-failed li:not(.is-passed),
+.idea-form .quality-list.show-failed li:not(.is-passed) .check-icon {
+  color: var(--red);
+}
+
 /* Foot bar — submit + cancel */
 .idea-form-foot {
   display: flex; justify-content: space-between; align-items: center;
