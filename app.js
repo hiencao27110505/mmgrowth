@@ -129,27 +129,14 @@ function bindUI() {
   // Form submit
   document.getElementById('submitForm').addEventListener('submit', handleSubmit);
 
-  // Live quality checklist updates
-  ['fWhat', 'fWhy', 'fHow'].forEach(id => {
+  // Clear stale error highlights as the user edits any field
+  ['fObjective', 'fWhat', 'fWhy', 'fHow'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.addEventListener('input', renderChecklists);
-  });
-  renderChecklists();
-
-  // Objective combobox — re-render checklist as user types/picks (so the
-  // form's overall error highlight clears once they've entered something).
-  document.getElementById('fObjective').addEventListener('input', renderChecklists);
-
-  // Rules-toggle buttons — collapse/expand the per-field writing-rules list
-  document.querySelectorAll('.idea-rules-toggle').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const field = btn.dataset.rulesFor;
-      const cap = field.charAt(0).toUpperCase() + field.slice(1);
-      const list = document.getElementById('check' + cap);
-      if (!list) return;
-      const open = btn.getAttribute('aria-expanded') === 'true';
-      btn.setAttribute('aria-expanded', open ? 'false' : 'true');
-      list.hidden = open;
+    if (!el) return;
+    el.addEventListener('input', () => {
+      el.classList.remove('has-error');
+      const errEl = document.getElementById('formError');
+      if (errEl) errEl.hidden = true;
     });
   });
 
@@ -1200,86 +1187,6 @@ const QUALITY_CHECKS = {
   ]
 };
 
-// Per-field minimum char thresholds — used for the live counter under each
-// textarea. Mirrors the corresponding QUALITY_CHECKS length rule.
-const FIELD_MIN_CHARS = { what: 40, why: 60, how: 40 };
-
-function renderChecklists() {
-  // Any edit clears a stale error banner from a prior failed submit
-  const formErrEl = document.getElementById('formError');
-  if (formErrEl) formErrEl.hidden = true;
-
-  ['what', 'why', 'how'].forEach(field => {
-    const cap = field.charAt(0).toUpperCase() + field.slice(1);
-    const input = document.getElementById('f' + cap);
-    const container = document.getElementById('check' + cap);
-    if (!container || !input) return;
-    const value = input.value || '';
-
-    // Render the rules list (still hidden behind the toggle until expanded)
-    const items = QUALITY_CHECKS[field].map(c => {
-      const passed = c.test(value);
-      return `<li class="${passed ? 'is-passed' : ''}">
-        <span class="check-icon" aria-hidden="true">${passed ? '✓' : '○'}</span>
-        <span class="check-label">${escapeHtml(c.label)}</span>
-      </li>`;
-    }).join('');
-    container.innerHTML = items;
-
-    // Count passing rules for the toggle indicator
-    const total = QUALITY_CHECKS[field].length;
-    const passed = QUALITY_CHECKS[field].filter(c => c.test(value)).length;
-    const allPass = passed === total;
-
-    // Live counter — words for the title-style "what" field, chars otherwise.
-    const counterEl = document.querySelector(`[data-counter="${field}"]`);
-    if (counterEl) {
-      if (field === 'what') {
-        const wordCount = (value.trim().match(/\S+/g) || []).length;
-        const met = wordCount >= 3 && wordCount <= 5;
-        counterEl.classList.toggle('is-met', met);
-        counterEl.textContent = wordCount === 0
-          ? `0 / 5 words`
-          : `${wordCount} word${wordCount === 1 ? '' : 's'}`;
-      } else {
-        const min = FIELD_MIN_CHARS[field] || 0;
-        const len = value.trim().length;
-        const met = len >= min;
-        counterEl.classList.toggle('is-met', met);
-        counterEl.textContent = met
-          ? `${len} chars`
-          : `${len} / ${min} chars`;
-      }
-    }
-
-    // Rules-toggle indicator (○ → ✓ green when all pass, ● orange when partial)
-    const toggleEl = document.querySelector(`[data-rules-for="${field}"]`);
-    if (toggleEl) {
-      toggleEl.classList.toggle('is-passing', allPass);
-      toggleEl.classList.toggle('is-failing', !allPass && passed > 0);
-      const labelEl = document.querySelector(`[data-rules-label-for="${field}"]`);
-      const iconEl = toggleEl.querySelector('.rules-icon');
-      if (iconEl) iconEl.textContent = allPass ? '✓' : (passed > 0 ? '●' : '○');
-      if (labelEl) {
-        labelEl.textContent = value.trim().length === 0
-          ? 'writing rules'
-          : `${passed}/${total} rules met`;
-      }
-    }
-
-    // Clear error highlight once all rules pass
-    if (allPass) {
-      input.classList.remove('has-error');
-      container.classList.remove('show-failed');
-    }
-  });
-
-  // Objective field — combobox now, no separate "Other" input. Just clear
-  // the highlight when something is typed/picked.
-  const obj = document.getElementById('fObjective');
-  if (obj && obj.value && obj.value.trim()) obj.classList.remove('has-error');
-}
-
 // Returns set of field keys that fail validation. Used by handleSubmit.
 function collectFailingFields() {
   const failing = new Set();
@@ -1297,16 +1204,7 @@ function highlightFailingFields(failing) {
   ['what', 'why', 'how'].forEach(field => {
     const cap = field.charAt(0).toUpperCase() + field.slice(1);
     const input = document.getElementById('f' + cap);
-    const checklist = document.getElementById('check' + cap);
-    const toggle = document.querySelector(`[data-rules-for="${field}"]`);
-    if (failing.has(field)) {
-      input && input.classList.add('has-error');
-      checklist && checklist.classList.add('show-failed');
-      // Auto-expand the rules list so the user can see what failed
-      if (toggle && toggle.getAttribute('aria-expanded') !== 'true') {
-        toggle.click();
-      }
-    }
+    if (failing.has(field) && input) input.classList.add('has-error');
   });
   if (failing.has('objective')) {
     const obj = document.getElementById('fObjective');
@@ -1328,16 +1226,7 @@ function scrollToFirstFailing(failing) {
 function resetSubmitForm() {
   document.getElementById('submitForm').reset();
   document.getElementById('formError').hidden = true;
-  // Clear any error highlights from a prior failed attempt
-  document.querySelectorAll('.has-error').forEach(el => el.classList.remove('has-error'));
-  document.querySelectorAll('.quality-list.show-failed').forEach(el => el.classList.remove('show-failed'));
-  // Collapse all rules toggles back to closed
-  document.querySelectorAll('.idea-rules-toggle[aria-expanded="true"]').forEach(t => {
-    t.setAttribute('aria-expanded', 'false');
-    const target = document.getElementById('check' + t.dataset.rulesFor.charAt(0).toUpperCase() + t.dataset.rulesFor.slice(1));
-    if (target) target.hidden = true;
-  });
-  renderChecklists();
+  document.querySelectorAll('#submitForm .has-error').forEach(el => el.classList.remove('has-error'));
 }
 
 // Confetti celebration on successful submit. MoMo brand colors. Fires three
@@ -1380,11 +1269,24 @@ async function handleSubmit(e) {
     const allFailing = new Set(failingQuality);
     integrityFailures.forEach(f => allFailing.add(f.field));
     highlightFailingFields(allFailing);
-    if (integrityFailures.length > 0) {
-      showFormErrorList(integrityFailures);
-    } else {
-      showFormError('Please address the highlighted requirements before submitting.');
-    }
+
+    // Build a flat list of what's wrong, per field, so the user can act on it
+    // without us needing to render an inline checklist.
+    const reasons = [];
+    if (failingQuality.has('objective')) reasons.push({ fieldLabel: 'Objective', reason: 'is required' });
+    ['what', 'why', 'how'].forEach(field => {
+      if (!failingQuality.has(field)) return;
+      const cap = field.charAt(0).toUpperCase() + field.slice(1);
+      const value = (document.getElementById('f' + cap) || {}).value || '';
+      QUALITY_CHECKS[field].forEach(rule => {
+        if (!rule.test(value)) {
+          reasons.push({ fieldLabel: cap, reason: rule.label.replace(/—.*$/, '').trim() });
+        }
+      });
+    });
+    integrityFailures.forEach(f => reasons.push({ fieldLabel: f.fieldLabel, reason: f.reason }));
+
+    showFormErrorList(reasons);
     scrollToFirstFailing(allFailing);
     return;
   }
@@ -1439,11 +1341,12 @@ function showFormError(msg) {
   el.hidden = false;
 }
 
-// Anti-cheat reasons: bullet list with the field name so the user knows what to fix.
+// Bullet list of every failing rule, grouped by field, so the user can fix
+// everything in one pass without having to expand inline checklists.
 function showFormErrorList(failures) {
   const el = document.getElementById('formError');
   el.innerHTML =
-    '<strong>This doesn\'t read like a real submission.</strong>' +
+    '<strong>Fix the following before submitting:</strong>' +
     '<ul style="margin:6px 0 0 18px;padding:0">' +
       failures.map(f =>
         `<li><strong>${escapeHtml(f.fieldLabel)}</strong> ${escapeHtml(f.reason)}.</li>`

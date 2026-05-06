@@ -631,88 +631,44 @@ a:hover { text-decoration: underline; }
 
 /* ─── Submit-an-idea modal (Timeline header → popup) ─────────────────── */
 .submit-modal-card { max-width: 580px; }
-.idea-form { padding: 8px 28px 24px; }
-.idea-form-intro {
-  font-size: 13px; color: var(--ink-3); line-height: 1.55;
-  margin: 0 0 22px;
-  padding-bottom: 18px; border-bottom: 1px solid var(--border);
-}
+.idea-form { padding: 4px 28px 20px; }
 
-/* Field block — label + helper + control + meta + rules */
-.idea-field { margin-bottom: 24px; }
+/* Field block — label + control */
+.idea-field { margin-bottom: 16px; flex: 1; min-width: 0; }
 .idea-label {
   display: block;
-  font-size: 14px; font-weight: 600; color: var(--ink);
-  margin-bottom: 4px;
+  font-size: 13px; font-weight: 600; color: var(--ink);
+  margin-bottom: 6px;
 }
-.idea-hint {
-  font-size: 12px; color: var(--ink-3); line-height: 1.5;
-  margin: 0 0 8px;
+.idea-label-hint {
+  font-weight: 400; color: var(--ink-3); font-size: 12px; margin-left: 4px;
 }
-.idea-hint em { font-style: italic; color: var(--ink-2); }
+
+/* Side-by-side row for compact optional fields (When + User flow) */
+.idea-field-row {
+  display: flex; gap: 16px; align-items: flex-start;
+  margin-bottom: 16px;
+}
+.idea-field-row .idea-field { margin-bottom: 0; }
 
 .idea-form input[type="text"],
+.idea-form select,
 .idea-form textarea {
   width: 100%; box-sizing: border-box;
   font: inherit; font-size: 14px; color: var(--ink);
   padding: 9px 12px; border: 1px solid var(--border); border-radius: 6px;
   background: var(--white); line-height: 1.5;
 }
-.idea-form textarea { resize: vertical; min-height: 60px; }
+.idea-form textarea { resize: vertical; min-height: 44px; }
 .idea-form input[type="text"]:focus,
+.idea-form select:focus,
 .idea-form textarea:focus {
   outline: none; border-color: var(--momo);
   box-shadow: 0 0 0 3px var(--momo-light);
 }
 
-/* Counter + rules-toggle row directly under the field */
-.idea-meta {
-  display: flex; justify-content: space-between; align-items: center;
-  gap: 12px; margin-top: 6px;
-  font-size: 12px;
-}
-.idea-counter {
-  color: var(--ink-3); transition: color 0.15s ease;
-}
-.idea-counter.is-met { color: var(--green); font-weight: 500; }
-.idea-counter.is-met::before { content: '✓ '; }
-
-.idea-rules-toggle {
-  background: transparent; border: 0; cursor: pointer;
-  font: inherit; font-size: 12px; color: var(--ink-3);
-  padding: 2px 0;
-  display: inline-flex; align-items: center; gap: 6px;
-  transition: color 0.15s ease;
-}
-.idea-rules-toggle:hover { color: var(--ink); }
-.idea-rules-toggle .rules-icon { font-size: 14px; line-height: 1; }
-.idea-rules-toggle.is-passing .rules-icon { color: var(--green); }
-.idea-rules-toggle.is-passing { color: var(--green); }
-.idea-rules-toggle.is-failing .rules-icon { color: var(--orange); }
-.idea-rules-toggle .rules-caret {
-  font-size: 9px; transition: transform 0.15s ease;
-}
-.idea-rules-toggle[aria-expanded="true"] .rules-caret { transform: rotate(90deg); }
-
-/* Rules list — collapsed by default, expands when toggled */
-.idea-form .quality-list {
-  list-style: none; padding: 10px 12px; margin: 8px 0 0;
-  background: var(--surface); border-radius: 6px;
-  font-size: 12px; line-height: 1.6;
-}
-.idea-form .quality-list li {
-  display: flex; align-items: flex-start; gap: 8px;
-  color: var(--ink-3); padding: 2px 0;
-}
-.idea-form .quality-list li.is-passed { color: var(--green); }
-.idea-form .quality-list .check-icon {
-  flex-shrink: 0; font-size: 13px; line-height: 1.4; width: 14px;
-}
-.idea-form .quality-list.show-failed li:not(.is-passed) {
-  color: var(--red);
-}
-.idea-form .quality-list.show-failed li:not(.is-passed) .check-icon {
-  color: var(--red);
+@media (max-width: 560px) {
+  .idea-field-row { flex-direction: column; gap: 16px; }
 }
 
 /* Foot bar — submit + cancel */

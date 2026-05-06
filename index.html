@@ -117,81 +117,47 @@
         <button class="btn btn-link" data-submit-close>×</button>
       </div>
       <form id="submitForm" class="idea-form">
-        <p class="idea-form-intro">Propose a new initiative. It lands in the roadmap with <strong>Status = Backlog</strong> for the PM to triage. Brief like you're explaining to your boss in 60 seconds.</p>
-
         <div class="idea-field">
-          <label class="idea-label" for="fObjective">Strategic objective</label>
-          <p class="idea-hint">Pick one from the team's existing objectives, or type a new one to propose.</p>
+          <label class="idea-label" for="fObjective">Objective</label>
           <input id="fObjective" name="fObjective" type="text"
                  list="objectiveSuggestions"
-                 placeholder="e.g. Reduce eKYC drop-off"
+                 placeholder="Pick existing or type new — e.g. Reduce eKYC drop-off"
                  autocomplete="off" required />
           <datalist id="objectiveSuggestions"></datalist>
         </div>
 
         <div class="idea-field" data-field="what">
-          <label class="idea-label" for="fWhat">What</label>
-          <p class="idea-hint">3–5 words. Just the initiative title — e.g. <em>"NFC fallback for eKYC"</em>.</p>
+          <label class="idea-label" for="fWhat">What <span class="idea-label-hint">· 3–5 words</span></label>
           <textarea id="fWhat" rows="1" required placeholder="e.g. NFC fallback for eKYC"></textarea>
-          <div class="idea-meta">
-            <span class="idea-counter" data-counter="what">0 / 5 words</span>
-            <button type="button" class="idea-rules-toggle" data-rules-for="what" aria-expanded="false">
-              <span class="rules-icon" aria-hidden="true">○</span>
-              <span class="rules-label" data-rules-label-for="what">writing rules</span>
-              <span class="rules-caret" aria-hidden="true">▸</span>
-            </button>
-          </div>
-          <ul class="quality-list" id="checkWhat" hidden></ul>
         </div>
 
         <div class="idea-field" data-field="why">
-          <label class="idea-label" for="fWhy">Why</label>
-          <p class="idea-hint">The customer problem, quantified. Drop-off %, NPS, tickets, revenue at risk. No weasel words.</p>
-          <textarea id="fWhy" rows="3" required placeholder="What problem does this solve? Who hurts today? Include real numbers."></textarea>
-          <div class="idea-meta">
-            <span class="idea-counter" data-counter="why">0 / 60 chars</span>
-            <button type="button" class="idea-rules-toggle" data-rules-for="why" aria-expanded="false">
-              <span class="rules-icon" aria-hidden="true">○</span>
-              <span class="rules-label" data-rules-label-for="why">writing rules</span>
-              <span class="rules-caret" aria-hidden="true">▸</span>
-            </button>
-          </div>
-          <ul class="quality-list" id="checkWhy" hidden></ul>
+          <label class="idea-label" for="fWhy">Why <span class="idea-label-hint">· user problem + a number</span></label>
+          <textarea id="fWhy" rows="3" required placeholder="e.g. 30% of users abandon eKYC after camera scan fails — costs ~200 signups/day."></textarea>
         </div>
 
         <div class="idea-field" data-field="how">
-          <label class="idea-label" for="fHow">How</label>
-          <p class="idea-hint">High-level approach + MVP scope. What's deliberately out. Mention 1–2 alternatives considered.</p>
-          <textarea id="fHow" rows="2" required placeholder="Approach in plain English. MVP scope and what's out of scope."></textarea>
-          <div class="idea-meta">
-            <span class="idea-counter" data-counter="how">0 / 40 chars</span>
-            <button type="button" class="idea-rules-toggle" data-rules-for="how" aria-expanded="false">
-              <span class="rules-icon" aria-hidden="true">○</span>
-              <span class="rules-label" data-rules-label-for="how">writing rules</span>
-              <span class="rules-caret" aria-hidden="true">▸</span>
-            </button>
+          <label class="idea-label" for="fHow">How <span class="idea-label-hint">· approach + MVP scope</span></label>
+          <textarea id="fHow" rows="2" required placeholder="e.g. Detect NFC-capable phones, offer NFC as primary path. MVP: Android only, iOS in v2."></textarea>
+        </div>
+
+        <div class="idea-field-row">
+          <div class="idea-field">
+            <label class="idea-label" for="fWhen">When <span class="idea-label-hint">· optional</span></label>
+            <select id="fWhen" name="fWhen">
+              <option value="">— No month —</option>
+            </select>
           </div>
-          <ul class="quality-list" id="checkHow" hidden></ul>
-        </div>
-
-        <div class="idea-field">
-          <label class="idea-label" for="fWhen">When (ETA)</label>
-          <p class="idea-hint">Target month. Leave empty if not yet planned.</p>
-          <select id="fWhen" name="fWhen">
-            <option value="">— No month —</option>
-          </select>
-        </div>
-
-        <div class="idea-field">
-          <label class="idea-label" for="fUserFlow">User flow</label>
-          <p class="idea-hint">Step-by-step user flow — used as a prompt to generate the prototype.</p>
-          <textarea id="fUserFlow" rows="3" placeholder="e.g. 1) User opens MoMo → 2) Taps eKYC → 3) System detects NFC chip → 4) Prompts to tap CCCD on back of phone → 5) Reads chip → 6) Confirms identity → 7) Returns to home with verified badge"></textarea>
+          <div class="idea-field">
+            <label class="idea-label" for="fUserFlow">User flow <span class="idea-label-hint">· optional, used to generate prototype</span></label>
+            <textarea id="fUserFlow" rows="2" placeholder="e.g. 1) Open MoMo → 2) Tap eKYC → 3) Detect NFC → 4) Tap CCCD → 5) Confirm"></textarea>
+          </div>
         </div>
 
         <div id="formError" class="form-error" hidden></div>
 
         <div class="idea-form-foot">
-          <span class="idea-meta-inline">Submitting as <strong id="submitterEmail"></strong></span>
+          <span class="idea-meta-inline">As <strong id="submitterEmail"></strong></span>
           <div class="idea-form-actions">
             <button type="button" class="btn btn-link" data-submit-close>Cancel</button>
             <button type="submit" class="btn btn-primary" id="submitFormBtn">Submit idea</button>
