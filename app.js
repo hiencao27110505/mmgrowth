@@ -902,11 +902,12 @@ function prefillSubmitForm(r) {
   set('fWhy',       r.Why);
   set('fHow',       r.How);
   set('fUserFlow',  r['User Flow']);
+  set('fStatus',    (r.Status || 'Backlog'));
 
   const parsed = parseWhenToMonth(r.When);
   set('fWhen', parsed ? String(parsed.month) : '');
 
-  const teams = String(r['Tech Team'] || '').split(/\s*,\s*/).filter(Boolean);
+  const teams = String(r.Tech || r['Tech Team'] || '').split(/\s*,\s*/).filter(Boolean);
   document.querySelectorAll('#fTechTeams input[name="techTeam"]').forEach(cb => {
     cb.checked = teams.includes(cb.value);
   });
@@ -1424,12 +1425,13 @@ async function handleSubmit(e) {
 
   const fields = {
     Objective: objective,
+    Status:    (document.getElementById('fStatus') || {}).value || 'Backlog',
     What:      document.getElementById('fWhat').value.trim(),
     Why:       document.getElementById('fWhy').value.trim(),
     How:       document.getElementById('fHow').value.trim(),
     When:      whenStr,
     'User Flow': (document.getElementById('fUserFlow') || {}).value.trim(),
-    'Tech Team': Array.from(document.querySelectorAll('#fTechTeams input[name="techTeam"]:checked'))
+    Tech: Array.from(document.querySelectorAll('#fTechTeams input[name="techTeam"]:checked'))
       .map(cb => cb.value).join(', ')
   };
   const btn = document.getElementById('submitFormBtn');
@@ -1497,7 +1499,8 @@ async function handleSubmit(e) {
     objective,
     objectiveIsNew: isNew,
     what: fields.What, why: fields.Why, how: fields.How,
-    when: fields.When, userFlow: fields['User Flow'], techTeam: fields['Tech Team']
+    when: fields.When, userFlow: fields['User Flow'], tech: fields.Tech,
+    status: fields.Status
   };
 
   if (CONFIG.USE_MOCK) {
