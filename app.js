@@ -641,6 +641,14 @@ function parseWhenToMonth(whenStr) {
   const yearMatch = s.match(/(20\d{2})/);
   const y = yearMatch ? parseInt(yearMatch[1], 10) : curY;
 
+  // ISO-like format: "2026-06-01", "2026/06/01 00:00" — what Apps Script emits
+  // when Sheets auto-typed the "When" cell as a Date. Must come BEFORE the
+  // Q-format check because "Q1" doesn't appear here, but "06" is the month.
+  const isoMatch = s.match(/(20\d{2})[-\/](0?[1-9]|1[0-2])(?:[-\/]\d{1,2})?/);
+  if (isoMatch) {
+    return { year: parseInt(isoMatch[1], 10), month: parseInt(isoMatch[2], 10) };
+  }
+
   // Q-format: "Q2", "Q2 2026", "2026 Q2" → first month of that quarter
   const qMatch = s.match(/Q\s*([1-4])/i);
   if (qMatch) {
