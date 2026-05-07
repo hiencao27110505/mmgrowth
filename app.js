@@ -480,22 +480,26 @@ function renderRoadmapGlance() {
 
   // Glance reflects scheduled, non-backlog work only — backlog has its own tab.
   const scheduled = STATE.rows.filter(r => !isBacklogRow(r));
-  const rows = applyTimelineFilters(scheduled);
+
+  // Fixed 3-column window — previous, current, next month — same as the
+  // timeline columns below so the eye can map the two views 1:1.
+  const today = new Date();
+  const windowMonths = [-1, 0, 1].map(offset => {
+    const d = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+    return { year: d.getFullYear(), month: d.getMonth() + 1 };
+  });
+  const monthKeys = windowMonths.map(m => `${m.year}-${String(m.month).padStart(2, '0')}`);
+  const monthSet = {};
+  windowMonths.forEach((m, i) => {
+    const synthetic = `${MONTH_NAMES_SHORT[m.month - 1]} ${m.year}`;
+    const lab = monthLabel(synthetic);
+    monthSet[monthKeys[i]] = (lab && typeof lab === 'object') ? (lab.text || '') : String(lab || '');
+  });
+
+  const inWindow = (r) => monthKeys.indexOf(monthKey(r.When)) !== -1;
+  const rows = applyTimelineFilters(scheduled).filter(inWindow);
   if (rows.length === 0) { host.hidden = true; host.innerHTML = ''; return; }
   host.hidden = false;
-
-  // Distinct months actually present (sorted asc)
-  const monthSet = {};
-  scheduled.forEach(r => {
-    const k = monthKey(r.When);
-    if (!monthSet[k]) {
-      const lab = monthLabel(r.When);
-      monthSet[k] = (lab && typeof lab === 'object') ? (lab.text || '') : String(lab || '');
-    }
-  });
-  const monthKeys = Object.keys(monthSet)
-    .filter(k => k !== 'unscheduled')
-    .sort((a, b) => a.localeCompare(b));
 
   // Group filtered rows by Objective → Month
   const NO_OBJ = '(no objective)';
