@@ -467,25 +467,33 @@ function renderRoadmapGlance() {
   const monthSet = {};
   STATE.rows.forEach(r => {
     const k = monthKey(r.When);
-    if (!monthSet[k]) monthSet[k] = monthLabel(r.When);
+    if (!monthSet[k]) {
+      const lab = monthLabel(r.When);
+      monthSet[k] = (lab && typeof lab === 'object') ? (lab.text || '') : String(lab || '');
+    }
   });
-  const monthKeys = Object.keys(monthSet).sort((a, b) => {
-    if (a === 'unscheduled') return 1;
-    if (b === 'unscheduled') return -1;
-    return a.localeCompare(b);
-  });
+  const monthKeys = Object.keys(monthSet)
+    .filter(k => k !== 'unscheduled')
+    .sort((a, b) => a.localeCompare(b));
 
   // Group filtered rows by Objective → Month
   const NO_OBJ = '(no objective)';
   const objMap = new Map(); // objective → { monthKey → [rows] }
   rows.forEach(r => {
-    const obj = (r.Objective || '').trim() || NO_OBJ;
     const mk = monthKey(r.When);
+    if (mk === 'unscheduled') return; // glance shows scheduled work only
+    const obj = (r.Objective || '').trim() || NO_OBJ;
     if (!objMap.has(obj)) objMap.set(obj, {});
     const buckets = objMap.get(obj);
     if (!buckets[mk]) buckets[mk] = [];
     buckets[mk].push(r);
   });
+
+  // If every row is unscheduled, hide the glance entirely
+  if (monthKeys.length === 0 || objMap.size === 0) {
+    host.hidden = true; host.innerHTML = '';
+    return;
+  }
 
   // Stable objective ordering: existing STATE.objectives order, then "(no objective)" last
   const objectives = [
