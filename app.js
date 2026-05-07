@@ -18,7 +18,7 @@ const STATE = {
   objectives: [],
   view: 'timeline',
   fetchedAt: 0,
-  filters: { objective: '', owner: '', status: '', quality: '' }, // Timeline filters; '' = no filter
+  filters: { objective: '', owner: '', status: '', tech: '', quality: '' }, // Timeline filters; '' = no filter
   synthesis: {
     stakeholder: { text: '', generatedAt: 0 },
     operational: { text: '', generatedAt: 0 }
@@ -211,7 +211,11 @@ async function fetchData(forceRefresh = false) {
 
   showLoader(true);
   try {
-    const data = await jsonpCall({ action: 'read', token: AUTH.getToken() });
+    const data = await jsonpCall({
+      action: 'read',
+      token: AUTH.getToken(),
+      ...(forceRefresh ? { fresh: '1' } : {})
+    });
     if (!data.ok) throw new Error(data.error || 'Failed to load');
     // Normalize header keys: actual sheet headers may be multi-line (e.g.
     // "Objective\nJTBDs"); collapse to the first line so r.Objective works.
@@ -393,6 +397,10 @@ function applyTimelineFilters(rows) {
     if (f.objective && (r.Objective || '').trim() !== f.objective) return false;
     if (f.owner  && (r.Who    || '').trim() !== f.owner)  return false;
     if (f.status && (r.Status || '').trim() !== f.status) return false;
+    if (f.tech) {
+      const teams = String(r.Tech || r['Tech Team'] || '').split(/\s*,\s*/).filter(Boolean);
+      if (!teams.includes(f.tech)) return false;
+    }
     if (f.quality === 'complete' && missingFields(r).length > 0)  return false;
     if (f.quality === 'gaps'     && missingFields(r).length === 0) return false;
     return true;
@@ -417,6 +425,7 @@ function populateTimelineFilters() {
   const objectiveSel = document.getElementById('filterObjective');
   const ownerSel  = document.getElementById('filterOwner');
   const statusSel = document.getElementById('filterStatus');
+  const techSel   = document.getElementById('filterTech');
   const qSel      = document.getElementById('filterQuality');
   if (objectiveSel) {
     const cur = STATE.filters.objective;
@@ -445,16 +454,33 @@ function populateTimelineFilters() {
     else { statusSel.value = ''; STATE.filters.status = ''; }
     statusSel.onchange = (e) => onFilterChange('status', e.target.value);
   }
+  if (techSel) {
+    // Tech values are comma-separated per row — split + dedupe across all rows.
+    const techSet = new Set();
+    STATE.rows.forEach(r => {
+      String(r.Tech || r['Tech Team'] || '')
+        .split(/\s*,\s*/).filter(Boolean)
+        .forEach(t => techSet.add(t));
+    });
+    const techs = Array.from(techSet).sort((a, b) => a.localeCompare(b));
+    const cur = STATE.filters.tech;
+    techSel.innerHTML = '<option value="">All</option>' +
+      techs.map(t => `<option value="${escapeAttr(t)}">${escapeHtml(t)}</option>`).join('');
+    if (techs.includes(cur)) techSel.value = cur;
+    else { techSel.value = ''; STATE.filters.tech = ''; }
+    techSel.onchange = (e) => onFilterChange('tech', e.target.value);
+  }
   if (qSel) {
     qSel.value = STATE.filters.quality;
     qSel.onchange = (e) => onFilterChange('quality', e.target.value);
   }
   const clearBtn = document.getElementById('clearFiltersBtn');
   if (clearBtn) clearBtn.onclick = () => {
-    STATE.filters = { objective: '', owner: '', status: '', quality: '' };
+    STATE.filters = { objective: '', owner: '', status: '', tech: '', quality: '' };
     if (objectiveSel) objectiveSel.value = '';
     if (ownerSel)     ownerSel.value     = '';
     if (statusSel)    statusSel.value    = '';
+    if (techSel)      techSel.value      = '';
     if (qSel)         qSel.value         = '';
     updateClearFiltersBtn();
     renderTimeline();
@@ -464,7 +490,7 @@ function populateTimelineFilters() {
 
 function updateClearFiltersBtn() {
   const f = STATE.filters;
-  const hasAny = !!(f.objective || f.owner || f.status || f.quality);
+  const hasAny = !!(f.objective || f.owner || f.status || f.tech || f.quality);
   const btn = document.getElementById('clearFiltersBtn');
   if (btn) btn.hidden = !hasAny;
 }
@@ -619,7 +645,7 @@ function renderTimeline() {
 
   // Filter-count chip: how many cards survived the filter (only when active)
   const f = STATE.filters;
-  const hasAny = !!(f.objective || f.owner || f.status || f.quality);
+  const hasAny = !!(f.objective || f.owner || f.status || f.tech || f.quality);
   const countEl = document.getElementById('filterCount');
   if (countEl) {
     countEl.hidden = !hasAny;
