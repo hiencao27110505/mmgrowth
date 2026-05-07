@@ -112,8 +112,9 @@ function bindUI() {
   // Sign out
   document.getElementById('signOutBtn').addEventListener('click', () => AUTH.signOut());
 
-  // Header "Submit an idea" → open the submit modal
-  document.getElementById('submitBtn').addEventListener('click', openSubmitModal);
+  // Header "Submit an idea" → open the submit modal in CREATE mode.
+  // Wrapped so the click event isn't passed in as `row`.
+  document.getElementById('submitBtn').addEventListener('click', () => openSubmitModal());
 
   // Submit modal close (delegated, same pattern as detail modal)
   const submitModalEl = document.getElementById('submitModal');
@@ -857,7 +858,11 @@ function linkSectionOrPlaceholder(label, value) {
 let CURRENT_EDIT_ROW = null;
 
 function openSubmitModal(row) {
-  CURRENT_EDIT_ROW = row || null;
+  // Guard: only treat the argument as a row if it's a plain row-like object
+  // (i.e. not a DOM Event from being used directly as an event listener).
+  const looksLikeRow = row && typeof row === 'object' && !(row instanceof Event)
+    && (('What' in row) || ('Objective' in row) || ('#' in row));
+  CURRENT_EDIT_ROW = looksLikeRow ? row : null;
   const modal = document.getElementById('submitModal');
   if (!modal) return;
   modal.hidden = false;
