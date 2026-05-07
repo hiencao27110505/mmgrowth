@@ -582,18 +582,31 @@ function renderRoadmapGlance() {
 function renderTimeline() {
   // Backlog rows live in their own tab — exclude from Timeline entirely.
   const timelineRows = STATE.rows.filter(r => !isBacklogRow(r));
-  const filtered = applyTimelineFilters(timelineRows);
 
-  // Stable column scaffold from timelineRows (unfiltered)
-  const groups = {};
-  timelineRows.forEach(r => {
-    const key = monthKey(r.When);
-    if (!groups[key]) {
-      groups[key] = { label: monthLabel(r.When), allRows: [], rows: [] };
-    }
-    groups[key].allRows.push(r);
+  // Fixed 3-column window: previous, current, next month relative to today.
+  // Rows scheduled outside this window are intentionally not shown here.
+  const today = new Date();
+  const windowMonths = [-1, 0, 1].map(offset => {
+    const d = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+    return { year: d.getFullYear(), month: d.getMonth() + 1 };
   });
-  // Distribute the surviving filtered rows into the existing month buckets
+  const windowKeys = windowMonths.map(m => `${m.year}-${String(m.month).padStart(2, '0')}`);
+  const inWindow = (r) => windowKeys.indexOf(monthKey(r.When)) !== -1;
+
+  const windowRows = timelineRows.filter(inWindow);
+  const filtered = applyTimelineFilters(windowRows);
+
+  // Always render all 3 columns, even if empty, so the structure is stable.
+  const groups = {};
+  windowMonths.forEach((m, i) => {
+    const key = windowKeys[i];
+    const synthetic = `${MONTH_NAMES_SHORT[m.month - 1]} ${m.year}`;
+    groups[key] = { label: monthLabel(synthetic), allRows: [], rows: [] };
+  });
+  windowRows.forEach(r => {
+    const key = monthKey(r.When);
+    if (groups[key]) groups[key].allRows.push(r);
+  });
   filtered.forEach(r => {
     const key = monthKey(r.When);
     if (groups[key]) groups[key].rows.push(r);
@@ -605,21 +618,11 @@ function renderTimeline() {
   const countEl = document.getElementById('filterCount');
   if (countEl) {
     countEl.hidden = !hasAny;
-    countEl.textContent = `${filtered.length} of ${timelineRows.length}`;
+    countEl.textContent = `${filtered.length} of ${windowRows.length}`;
   }
 
-  // Sort: chronological asc; unscheduled last
-  const sortedKeys = Object.keys(groups).sort((a, b) => {
-    if (a === 'unscheduled') return 1;
-    if (b === 'unscheduled') return -1;
-    return a.localeCompare(b);
-  });
-
-  if (sortedKeys.length === 0) {
-    document.getElementById('timelineColumns').innerHTML =
-      '<div class="empty-state">No initiatives in the sheet yet.</div>';
-    return;
-  }
+  // Fixed prev → current → next order
+  const sortedKeys = windowKeys;
 
   document.getElementById('timelineColumns').innerHTML = sortedKeys.map(key => {
     const g = groups[key];
