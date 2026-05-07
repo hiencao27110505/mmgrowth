@@ -331,7 +331,17 @@ function renderAll() {
   populateTimelineFilters();
   renderRoadmapGlance();
   renderTimeline();
+  renderBacklog();
   renderInsights();
+}
+
+// A row belongs in the Backlog tab when it has no scheduled month, OR when
+// its Status is "Backlog" (regardless of whether a month is set). Used by
+// both the Timeline (to exclude these) and the Backlog tab (to include them).
+function isBacklogRow(r) {
+  if (monthKey(r.When) === 'unscheduled') return true;
+  if (/^backlog$/i.test(String(r.Status || '').trim())) return true;
+  return false;
 }
 
 function switchView(view) {
@@ -340,6 +350,7 @@ function switchView(view) {
     t.classList.toggle('is-active', t.dataset.view === view);
   });
   document.getElementById('view-timeline').hidden  = view !== 'timeline';
+  document.getElementById('view-backlog').hidden   = view !== 'backlog';
   document.getElementById('view-insights').hidden  = view !== 'insights';
 }
 
@@ -459,13 +470,15 @@ function renderRoadmapGlance() {
   const host = document.getElementById('roadmapGlance');
   if (!host) return;
 
-  const rows = applyTimelineFilters(STATE.rows);
+  // Glance reflects scheduled, non-backlog work only — backlog has its own tab.
+  const scheduled = STATE.rows.filter(r => !isBacklogRow(r));
+  const rows = applyTimelineFilters(scheduled);
   if (rows.length === 0) { host.hidden = true; host.innerHTML = ''; return; }
   host.hidden = false;
 
-  // Distinct months actually present (sorted asc, "unscheduled" last)
+  // Distinct months actually present (sorted asc)
   const monthSet = {};
-  STATE.rows.forEach(r => {
+  scheduled.forEach(r => {
     const k = monthKey(r.When);
     if (!monthSet[k]) {
       const lab = monthLabel(r.When);
@@ -560,11 +573,13 @@ function renderRoadmapGlance() {
 // (no separate Backlog sheet read), so they appear in the "No timeline yet"
 // column naturally — no special-case merging needed.
 function renderTimeline() {
-  const filtered = applyTimelineFilters(STATE.rows);
+  // Backlog rows live in their own tab — exclude from Timeline entirely.
+  const timelineRows = STATE.rows.filter(r => !isBacklogRow(r));
+  const filtered = applyTimelineFilters(timelineRows);
 
-  // Stable column scaffold from STATE.rows (unfiltered)
+  // Stable column scaffold from timelineRows (unfiltered)
   const groups = {};
-  STATE.rows.forEach(r => {
+  timelineRows.forEach(r => {
     const key = monthKey(r.When);
     if (!groups[key]) {
       groups[key] = { label: monthLabel(r.When), allRows: [], rows: [] };
@@ -583,7 +598,7 @@ function renderTimeline() {
   const countEl = document.getElementById('filterCount');
   if (countEl) {
     countEl.hidden = !hasAny;
-    countEl.textContent = `${filtered.length} of ${STATE.rows.length}`;
+    countEl.textContent = `${filtered.length} of ${timelineRows.length}`;
   }
 
   // Sort: chronological asc; unscheduled last
@@ -629,6 +644,53 @@ function renderTimeline() {
   }).join('');
 
   bindCardClicks(document.getElementById('timelineColumns'));
+}
+
+// ─── Backlog tab ────────────────────────────────────────────────────────
+// Holds initiatives without a defined timeline AND/OR with Status=Backlog.
+// Triaging = giving them a When (or changing Status off "Backlog") via the
+// edit form, which moves them onto the Timeline.
+function renderBacklog() {
+  const backlogRows = STATE.rows.filter(isBacklogRow);
+
+  const tabCount = document.getElementById('backlogTabCount');
+  if (tabCount) {
+    tabCount.hidden = backlogRows.length === 0;
+    tabCount.textContent = String(backlogRows.length);
+  }
+
+  const grid = document.getElementById('backlogGrid');
+  if (!grid) return;
+  if (backlogRows.length === 0) {
+    grid.innerHTML = '<div class="empty-state" style="padding:32px 0">Backlog is empty — every initiative has a timeline and a non-backlog status.</div>';
+    return;
+  }
+
+  // Group by Objective so the backlog reads as a triage list, not a flat dump.
+  const byObj = new Map();
+  backlogRows.forEach(r => {
+    const obj = (r.Objective || '').trim() || '(no objective)';
+    if (!byObj.has(obj)) byObj.set(obj, []);
+    byObj.get(obj).push(r);
+  });
+
+  const objectives = Array.from(byObj.keys()).sort((a, b) => a.localeCompare(b));
+  grid.innerHTML = objectives.map(obj => {
+    const list = byObj.get(obj);
+    return `
+      <section class="backlog-group">
+        <header class="backlog-group-head">
+          <h3 class="backlog-group-title">${escapeHtml(obj)}</h3>
+          <span class="backlog-group-count">${list.length}</span>
+        </header>
+        <div class="backlog-group-cards">
+          ${list.map(initCardHTML).join('')}
+        </div>
+      </section>
+    `;
+  }).join('');
+
+  bindCardClicks(grid);
 }
 
 // ─── Month grouping helpers ─────────────────────────────────────────────
@@ -1323,6 +1385,7 @@ async function handleSubmit(e) {
         populateTimelineFilters();
         renderRoadmapGlance();
         renderTimeline();
+        renderBacklog();
         renderMetrics();
       }
       closeSubmitModal();

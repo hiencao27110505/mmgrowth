@@ -45,6 +45,7 @@
       <!-- View switcher -->
       <nav class="tabs">
         <button class="tab is-active" data-view="timeline">Timeline</button>
+        <button class="tab" data-view="backlog">Backlog <span id="backlogTabCount" class="tab-count" hidden></span></button>
         <button class="tab" data-view="insights">AI Insights</button>
       </nav>
 
@@ -76,6 +77,13 @@
           <span id="filterCount" class="filter-count" hidden></span>
         </div>
         <div id="timelineColumns" class="timeline"></div>
+      </section>
+      <section id="view-backlog" class="view" hidden>
+        <div class="backlog-intro">
+          <h2 class="backlog-title">Backlog</h2>
+          <p class="backlog-sub">Initiatives without a defined timeline, or with status set to <em>Backlog</em>. Triage these into a month and a status to move them onto the Timeline.</p>
+        </div>
+        <div id="backlogGrid" class="backlog-grid"></div>
       </section>
       <section id="view-insights" class="view" hidden>
         <div class="insights-controls">
