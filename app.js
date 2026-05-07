@@ -329,6 +329,7 @@ function loadMockData() {
 function renderAll() {
   renderMetrics();
   populateTimelineFilters();
+  renderRoadmapGlance();
   renderTimeline();
   renderInsights();
 }
@@ -382,6 +383,7 @@ function applyTimelineFilters(rows) {
 function onFilterChange(key, value) {
   STATE.filters[key] = value;
   updateClearFiltersBtn();
+  renderRoadmapGlance();
   renderTimeline();
 }
 
@@ -446,6 +448,99 @@ function updateClearFiltersBtn() {
   const hasAny = !!(f.objective || f.owner || f.status || f.quality);
   const btn = document.getElementById('clearFiltersBtn');
   if (btn) btn.hidden = !hasAny;
+}
+
+// ─── Roadmap at a glance (compact Objective × Month grid) ──────────────
+// Birds-eye view above the timeline: one row per Objective, one column per
+// month found in the data, each cell holds tiny clickable chips colored by
+// status. Respects active timeline filters so the glance and the cards below
+// always tell the same story.
+function renderRoadmapGlance() {
+  const host = document.getElementById('roadmapGlance');
+  if (!host) return;
+
+  const rows = applyTimelineFilters(STATE.rows);
+  if (rows.length === 0) { host.hidden = true; host.innerHTML = ''; return; }
+  host.hidden = false;
+
+  // Distinct months actually present (sorted asc, "unscheduled" last)
+  const monthSet = {};
+  STATE.rows.forEach(r => {
+    const k = monthKey(r.When);
+    if (!monthSet[k]) monthSet[k] = monthLabel(r.When);
+  });
+  const monthKeys = Object.keys(monthSet).sort((a, b) => {
+    if (a === 'unscheduled') return 1;
+    if (b === 'unscheduled') return -1;
+    return a.localeCompare(b);
+  });
+
+  // Group filtered rows by Objective → Month
+  const NO_OBJ = '(no objective)';
+  const objMap = new Map(); // objective → { monthKey → [rows] }
+  rows.forEach(r => {
+    const obj = (r.Objective || '').trim() || NO_OBJ;
+    const mk = monthKey(r.When);
+    if (!objMap.has(obj)) objMap.set(obj, {});
+    const buckets = objMap.get(obj);
+    if (!buckets[mk]) buckets[mk] = [];
+    buckets[mk].push(r);
+  });
+
+  // Stable objective ordering: existing STATE.objectives order, then "(no objective)" last
+  const objectives = [
+    ...STATE.objectives.filter(o => objMap.has(o)),
+    ...(objMap.has(NO_OBJ) ? [NO_OBJ] : [])
+  ];
+
+  const headerCells = monthKeys.map(k => {
+    const label = monthSet[k];
+    return `<div class="rg-th" title="${escapeAttr(label)}">${escapeHtml(label)}</div>`;
+  }).join('');
+
+  const bodyRows = objectives.map(obj => {
+    const buckets = objMap.get(obj) || {};
+    const cells = monthKeys.map(k => {
+      const list = buckets[k] || [];
+      const chips = list.map(r => {
+        const cls = statusClass(r.Status);
+        const title = `${r.What || '(no title)'}${r.Status ? ' · ' + r.Status : ''}${r.Who ? ' · ' + r.Who : ''}`;
+        return `<button type="button" class="rg-chip ${cls}"
+          data-row-key="${escapeAttr(r['#'] || '')}"
+          title="${escapeAttr(title)}">${escapeHtml(r.What || '(no title)')}</button>`;
+      }).join('');
+      return `<div class="rg-td">${chips}</div>`;
+    }).join('');
+    return `
+      <div class="rg-row">
+        <div class="rg-rowhead" title="${escapeAttr(obj)}">${escapeHtml(obj)}</div>
+        <div class="rg-cells" style="grid-template-columns: repeat(${monthKeys.length}, minmax(0, 1fr));">${cells}</div>
+      </div>
+    `;
+  }).join('');
+
+  host.innerHTML = `
+    <div class="rg-head">
+      <h3 class="rg-title">Roadmap at a glance</h3>
+      <span class="rg-meta">${objectives.length} objective${objectives.length === 1 ? '' : 's'} · ${monthKeys.length} month${monthKeys.length === 1 ? '' : 's'}</span>
+    </div>
+    <div class="rg-grid">
+      <div class="rg-headrow">
+        <div class="rg-rowhead rg-rowhead-empty"></div>
+        <div class="rg-cells" style="grid-template-columns: repeat(${monthKeys.length}, minmax(0, 1fr));">${headerCells}</div>
+      </div>
+      ${bodyRows}
+    </div>
+  `;
+
+  // Clicking a chip opens the same detail modal as a Timeline card
+  host.querySelectorAll('.rg-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const rowKey = btn.dataset.rowKey;
+      const row = STATE.rows.find(r => String(r['#']) === String(rowKey));
+      if (row) openDetailModal(row);
+    });
+  });
 }
 
 // ─── Timeline (grouped by Month) ───────────────────────────────────────
@@ -654,19 +749,59 @@ function linkSectionOrPlaceholder(label, value) {
   return `<h4>${label}</h4><p class="field-empty">— no link added</p>`;
 }
 
-// ─── Submit-an-idea modal (opens from header button) ───────────────────
-function openSubmitModal() {
+// ─── Submit-an-idea modal (opens from header button OR from a card click
+// in editor mode, in which case the form is pre-filled with the row data
+// and the submit handler issues an update instead of a create). ───────
+let CURRENT_EDIT_ROW = null;
+
+function openSubmitModal(row) {
+  CURRENT_EDIT_ROW = row || null;
   const modal = document.getElementById('submitModal');
   if (!modal) return;
   modal.hidden = false;
   document.body.style.overflow = 'hidden';
   populateSubmitWhenDropdown();
-  // Reset any stale error highlights from a previous attempt
   resetSubmitForm();
+
+  // Adapt the modal's title and primary button based on mode
+  const titleEl = document.getElementById('submitModalTitle');
+  const submitBtn = document.getElementById('submitFormBtn');
+  if (CURRENT_EDIT_ROW) {
+    if (titleEl)   titleEl.textContent   = 'Edit idea';
+    if (submitBtn) submitBtn.textContent = 'Save changes';
+    prefillSubmitForm(CURRENT_EDIT_ROW);
+  } else {
+    if (titleEl)   titleEl.textContent   = 'Submit an idea';
+    if (submitBtn) submitBtn.textContent = 'Submit idea';
+  }
+
   setTimeout(() => {
     const sel = document.getElementById('fObjective');
     if (sel) sel.focus();
   }, 30);
+}
+
+// Pre-fill the idea form from an existing row. Mirrors the field set the
+// form supports — Status / Owner / Prototype / Related Docs are not editable
+// here (PM updates those directly in the sheet, by design).
+function prefillSubmitForm(r) {
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+  set('fObjective', r.Objective);
+  set('fWhat',      r.What);
+  set('fWhy',       r.Why);
+  set('fHow',       r.How);
+  set('fUserFlow',  r['User Flow']);
+
+  const parsed = parseWhenToMonth(r.When);
+  set('fWhen', parsed ? String(parsed.month) : '');
+
+  const teams = String(r['Tech Team'] || '').split(/\s*,\s*/).filter(Boolean);
+  document.querySelectorAll('#fTechTeams input[name="techTeam"]').forEach(cb => {
+    cb.checked = teams.includes(cb.value);
+  });
+
+  // Refresh the live writing-rules indicators against the prefilled values
+  if (typeof renderChecklists === 'function') renderChecklists();
 }
 
 // Fill the "When" dropdown in the submit modal with the 12 months of 2026,
@@ -687,6 +822,7 @@ function closeSubmitModal() {
   const modal = document.getElementById('submitModal');
   if (!modal) return;
   modal.hidden = true;
+  CURRENT_EDIT_ROW = null;
   // Only restore body overflow if the detail modal isn't also open
   if (document.getElementById('detailModal').hidden) {
     document.body.style.overflow = '';
@@ -743,19 +879,16 @@ function isEditorViewer() {
 }
 
 function openDetailModal(r) {
+  // Editors edit through the same idea-submit form (pre-filled). Non-editors
+  // still see the read-only summary modal.
+  if (isEditorViewer()) { openSubmitModal(r); return; }
+
   CURRENT_DETAIL_ROW = r;
   const protoUrl = firstUrl(r.Prototype);
-  const canEdit = isEditorViewer();
-
   document.getElementById('detailModalTitle').textContent = r.What || '(no title)';
-  document.getElementById('detailModalBody').innerHTML = canEdit
-    ? renderDetailEditable(r, protoUrl)
-    : renderDetailReadonly(r, protoUrl);
-
+  document.getElementById('detailModalBody').innerHTML = renderDetailReadonly(r, protoUrl);
   document.getElementById('detailModal').hidden = false;
   document.body.style.overflow = 'hidden';
-
-  if (canEdit) wireDetailEditHandlers();
 }
 
 function closeDetailModal() {
@@ -783,282 +916,6 @@ function renderDetailReadonly(r, protoUrl) {
   `;
 }
 
-// Editable form for sheet rows. Each field is rendered as the right input
-// type. A single Save button at the bottom commits whatever changed.
-function renderDetailEditable(r, protoUrl) {
-  const objectiveOpts = STATE.objectives.map(o =>
-    `<option value="${escapeAttr(o)}"${o === (r.Objective || '').trim() ? ' selected' : ''}>${escapeHtml(o)}</option>`
-  ).join('');
-  const statusSet = new Set([
-    ...STATUS_OPTIONS,
-    ...STATE.rows.map(x => (x.Status || '').trim()).filter(Boolean)
-  ]);
-  if (r.Status) statusSet.add(r.Status.trim());
-  const statusOpts = ['', ...Array.from(statusSet)]
-    .map(s => `<option value="${escapeAttr(s)}"${s === (r.Status || '').trim() ? ' selected' : ''}>${s ? escapeHtml(s) : '— no status —'}</option>`)
-    .join('');
-
-  // When → year is fixed at 2026, only month is selectable
-  const parsed = parseWhenToMonth(r.When);
-  const curMonth = parsed ? parsed.month : '';
-  const monthOpts = [`<option value="">— No month —</option>`].concat(
-    MONTH_NAMES_SHORT.map((name, i) => {
-      const num = i + 1;
-      const sel = String(num) === String(curMonth) ? ' selected' : '';
-      return `<option value="${num}"${sel}>${name} 2026</option>`;
-    })
-  ).join('');
-
-  // Owner dropdown — pulled from existing distinct values in the sheet
-  const ownerSet = new Set(STATE.rows.map(x => (x.Who || '').trim()).filter(Boolean));
-  const curOwner = (r.Who || '').trim();
-  if (curOwner) ownerSet.add(curOwner);
-  const ownerOpts = ['', ...Array.from(ownerSet).sort((a, b) => a.localeCompare(b))]
-    .map(o => `<option value="${escapeAttr(o)}"${o === curOwner ? ' selected' : ''}>${o ? escapeHtml(o) : '— No owner —'}</option>`)
-    .join('');
-
-  return `
-    <form id="detailEditForm" class="detail-edit-form" data-row-key="${escapeAttr(r['#'] || '')}">
-      <div class="form-grid-2">
-        <label class="field">
-          <span class="field-label">Objective</span>
-          <select name="Objective">
-            <option value="">— Select —</option>
-            ${objectiveOpts}
-          </select>
-        </label>
-        <label class="field">
-          <span class="field-label">Status</span>
-          <select name="Status">${statusOpts}</select>
-        </label>
-      </div>
-
-      <label class="field">
-        <span class="field-label">What</span>
-        <textarea name="What" rows="2"
-          placeholder="Verb + noun + outcome — fits one line. e.g. Add NFC fallback to eKYC scan">${escapeHtml(r.What || '')}</textarea>
-      </label>
-
-      <label class="field">
-        <span class="field-label">Why</span>
-        <textarea name="Why" rows="3"
-          placeholder="The customer problem, quantified. e.g. 30% of users abandon eKYC after camera scan fails — costs 200 signups/day.">${escapeHtml(r.Why || '')}</textarea>
-      </label>
-
-      <label class="field">
-        <span class="field-label">How</span>
-        <textarea name="How" rows="3"
-          placeholder="Approach + MVP scope. e.g. Detect NFC-capable phones, offer NFC as primary path. MVP: Android only, iOS in v2.">${escapeHtml(r.How || '')}</textarea>
-      </label>
-
-      <label class="field">
-        <span class="field-label">User flow</span>
-        <textarea name="User Flow" rows="3"
-          placeholder="Step-by-step user flow — used as a prompt to generate the prototype. e.g. 1) User opens MoMo → 2) Taps eKYC → 3) System detects NFC chip → 4) Prompts to tap CCCD on back of phone → 5) Reads chip → 6) Confirms identity → 7) Returns to home with verified badge">${escapeHtml(r['User Flow'] || '')}</textarea>
-      </label>
-
-      <div class="form-grid-2">
-        <label class="field">
-          <span class="field-label">Owner</span>
-          <select name="Who">${ownerOpts}</select>
-        </label>
-        <label class="field">
-          <span class="field-label">When (ETA)</span>
-          <select name="WhenMonth">${monthOpts}</select>
-        </label>
-      </div>
-
-      <label class="field">
-        <span class="field-label">Prototype URL</span>
-        <input name="Prototype" type="url" value="${escapeAttr(r.Prototype || '')}" placeholder="https://…" />
-      </label>
-
-      <label class="field">
-        <span class="field-label">Related docs</span>
-        <input name="Related Docs" type="text" value="${escapeAttr(r['Related Docs'] || '')}" placeholder="One or more URLs, comma-separated" />
-      </label>
-
-      <div id="detailEditError" class="form-error" hidden></div>
-
-      <div class="detail-edit-foot">
-        <span class="detail-edit-meta" id="detailEditDirty">No changes yet</span>
-        <div class="detail-edit-actions">
-          <button type="button" class="btn btn-link" data-detail-close>Cancel</button>
-          <button type="submit" class="btn btn-primary" id="detailSaveBtn" disabled>Save changes</button>
-        </div>
-      </div>
-    </form>
-  `;
-}
-
-// Wire dirty tracking + submit handler each time the form is rendered.
-function wireDetailEditHandlers() {
-  const form = document.getElementById('detailEditForm');
-  if (!form) return;
-  const saveBtn = document.getElementById('detailSaveBtn');
-  const meta    = document.getElementById('detailEditDirty');
-
-  // Re-evaluate dirty state on any input/change. Also clears stale error
-  // highlights from a previous failed-validation submit so the user gets
-  // immediate feedback that they're addressing the issue.
-  function refreshDirty(e) {
-    const changes = collectDetailChanges();
-    const n = Object.keys(changes).length;
-    saveBtn.disabled = n === 0;
-    meta.textContent = n === 0
-      ? 'No changes yet'
-      : `${n} change${n > 1 ? 's' : ''} pending`;
-    // Clear has-error on the field being edited
-    if (e && e.target && e.target.classList) e.target.classList.remove('has-error');
-    document.getElementById('detailEditError').hidden = true;
-  }
-  form.addEventListener('input', refreshDirty);
-  form.addEventListener('change', refreshDirty);
-
-  form.addEventListener('submit', handleDetailSave);
-  refreshDirty();
-}
-
-// Diff the form against CURRENT_DETAIL_ROW. Returns { fieldName: newValue }
-// for fields that changed. Empty object = no changes.
-function collectDetailChanges() {
-  const r = CURRENT_DETAIL_ROW;
-  if (!r) return {};
-  const form = document.getElementById('detailEditForm');
-  if (!form) return {};
-  const fd = new FormData(form);
-  const changes = {};
-
-  ['Objective','Status','What','Why','How','User Flow','Who','Prototype','Related Docs'].forEach(name => {
-    const newVal = (fd.get(name) || '').toString().trim();
-    const oldVal = ((r[name] || '') + '').trim();
-    if (newVal !== oldVal) changes[name] = newVal;
-  });
-
-  // When: month-only (year fixed at 2026) → "Mmm 2026" or empty if cleared
-  const m = (fd.get('WhenMonth') || '').toString();
-  const newWhen = m ? `${MONTH_NAMES_SHORT[parseInt(m, 10) - 1]} 2026` : '';
-  const oldWhen = ((r.When || '') + '').trim();
-  if (newWhen !== oldWhen) changes['When'] = newWhen;
-
-  return changes;
-}
-
-async function handleDetailSave(e) {
-  e.preventDefault();
-  const r = CURRENT_DETAIL_ROW;
-  if (!r) return;
-
-  const changes = collectDetailChanges();
-  if (Object.keys(changes).length === 0) return;
-
-  // Writing-rules validation — only for What/Why/How fields the editor
-  // actually changed. Don't reject saves for legacy text the editor isn't
-  // touching, but DO enforce the rules on any new writing.
-  const touched = ['What', 'Why', 'How'].filter(k => k in changes);
-  if (touched.length > 0) {
-    const newValues = {
-      what: 'What' in changes ? changes['What'] : (r.What || ''),
-      why:  'Why'  in changes ? changes['Why']  : (r.Why  || ''),
-      how:  'How'  in changes ? changes['How']  : (r.How  || '')
-    };
-    const reasons = [];
-    const failingFields = new Set();
-
-    touched.forEach(label => {
-      const key = label.toLowerCase();
-      const value = newValues[key];
-      // Anti-cheat / real-text integrity
-      const cfg = INTEGRITY_CHECKS[key];
-      const integrity = validateRealText(value, cfg.minDistinctWords);
-      if (!integrity.ok) {
-        reasons.push(`${label}: ${integrity.reason}`);
-        failingFields.add(label);
-      }
-      // Amazonian writing rules
-      QUALITY_CHECKS[key].forEach(rule => {
-        if (!rule.test(value)) {
-          reasons.push(`${label}: ${rule.label.replace(/—.*$/, '').trim()}`);
-          failingFields.add(label);
-        }
-      });
-    });
-
-    if (reasons.length > 0) {
-      showDetailEditErrorList(reasons);
-      // Highlight failing textareas + scroll to the first one
-      failingFields.forEach(label => {
-        const el = document.querySelector(`#detailEditForm [name="${label}"]`);
-        if (el) el.classList.add('has-error');
-      });
-      const first = document.querySelector('#detailEditForm .has-error');
-      if (first) {
-        first.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        setTimeout(() => first.focus({ preventScroll: true }), 350);
-      }
-      return;
-    }
-  }
-
-  const rowKey = r['#'];
-  if (!rowKey) {
-    showDetailEditError('This row has no "#" key — cannot update. Check the sheet.');
-    return;
-  }
-
-  const btn = document.getElementById('detailSaveBtn');
-  btn.disabled = true;
-  btn.textContent = 'Saving…';
-
-  try {
-    const data = await jsonpCall({
-      action: 'update',
-      token: AUTH.getToken(),
-      rowKey: String(rowKey),
-      fields: JSON.stringify(changes)
-    });
-    if (!data.ok) throw new Error(data.error || 'update failed');
-
-    // Optimistic local update so Timeline reflects the change immediately
-    const idx = STATE.rows.findIndex(x => String(x['#']) === String(rowKey));
-    if (idx !== -1) {
-      STATE.rows[idx] = { ...STATE.rows[idx], ...changes };
-      // Refresh objective list in case Objective was changed to a new value
-      STATE.objectives = Array.from(new Set(
-        STATE.rows.map(x => (x.Objective || '').trim()).filter(Boolean)
-      )).sort((a, b) => a.localeCompare(b));
-      writeCachedData();
-      populateTimelineFilters();
-      renderTimeline();
-      renderMetrics();
-    }
-    closeDetailModal();
-    toast('Changes saved.');
-  } catch (err) {
-    btn.disabled = false;
-    btn.textContent = 'Save changes';
-    showDetailEditError(err.message);
-  }
-}
-
-function showDetailEditError(msg) {
-  const el = document.getElementById('detailEditError');
-  if (!el) return;
-  el.textContent = msg;
-  el.hidden = false;
-}
-
-// Bullet-list version for writing-rule failures across multiple fields.
-function showDetailEditErrorList(reasons) {
-  const el = document.getElementById('detailEditError');
-  if (!el) return;
-  el.innerHTML =
-    '<strong>Writing rules not met:</strong>' +
-    '<ul style="margin:6px 0 0 18px;padding:0">' +
-      reasons.map(r => `<li>${escapeHtml(r)}</li>`).join('') +
-    '</ul>';
-  el.hidden = false;
-}
 
 // ─── Submit form (lives in the Backlog tab) ────────────────────────────
 // Two-tier validation, by design:
@@ -1076,9 +933,12 @@ function validateRealText(s, minDistinctWords) {
   const text = String(s || '').trim();
   if (!text) return { ok: false, reason: 'is empty' };
 
-  // Repeated chunk (1–8 chars repeating 3+ times in a row)
-  // Catches: "ABCABCABC", "lalalala", "aaaaa", "blah blah blah blah".
-  if (/(.{1,8})\1{2,}/i.test(text)) return { ok: false, reason: 'contains a repeated pattern (e.g. "ABCABC…")' };
+  // Repeated chunk. Two-tier so we don't false-positive on real abbreviations:
+  //   - single char: needs 4+ in a row ("aaaa") so "CCCD" / "AAA Bank" pass
+  //   - 2–8 char chunk: needs 3+ in a row ("ABCABCABC", "lalalala", "blah blah blah")
+  if (/(.)\1{3,}/i.test(text) || /(.{2,8})\1{2,}/i.test(text)) {
+    return { ok: false, reason: 'contains a repeated pattern (e.g. "ABCABC…")' };
+  }
 
   // Spaces — real prose has multiple words separated by spaces
   const spaceCount = (text.match(/\s/g) || []).length;
@@ -1391,15 +1251,81 @@ async function handleSubmit(e) {
   const monthVal = (document.getElementById('fWhen') || {}).value || '';
   const whenStr  = monthVal ? `${MONTH_NAMES_SHORT[parseInt(monthVal, 10) - 1]} 2026` : '';
 
+  const fields = {
+    Objective: objective,
+    What:      document.getElementById('fWhat').value.trim(),
+    Why:       document.getElementById('fWhy').value.trim(),
+    How:       document.getElementById('fHow').value.trim(),
+    When:      whenStr,
+    'User Flow': (document.getElementById('fUserFlow') || {}).value.trim(),
+    'Tech Team': Array.from(document.querySelectorAll('#fTechTeams input[name="techTeam"]:checked'))
+      .map(cb => cb.value).join(', ')
+  };
+  const btn = document.getElementById('submitFormBtn');
+
+  // ── Edit mode: send only changed fields to the update endpoint ────────
+  if (CURRENT_EDIT_ROW) {
+    const r = CURRENT_EDIT_ROW;
+    const changes = {};
+    Object.keys(fields).forEach(k => {
+      const newVal = fields[k];
+      const oldVal = ((r[k] || '') + '').trim();
+      if (newVal !== oldVal) changes[k] = newVal;
+    });
+    if (Object.keys(changes).length === 0) {
+      closeSubmitModal();
+      toast('No changes to save.');
+      return;
+    }
+    const rowKey = r['#'];
+    if (!rowKey) { showFormError('This row has no "#" key — cannot update.'); return; }
+
+    if (CONFIG.USE_MOCK) {
+      console.log('[MOCK] Would UPDATE row', rowKey, 'with', changes);
+      closeSubmitModal();
+      toast('Mock update: changes would be saved.');
+      return;
+    }
+
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const data = await jsonpCall({
+        action: 'update',
+        token:  AUTH.getToken(),
+        rowKey: String(rowKey),
+        fields: JSON.stringify(changes)
+      });
+      if (!data.ok) throw new Error(data.error || 'update failed');
+      // Optimistic local update so Timeline reflects the change immediately
+      const idx = STATE.rows.findIndex(x => String(x['#']) === String(rowKey));
+      if (idx !== -1) {
+        STATE.rows[idx] = { ...STATE.rows[idx], ...changes };
+        STATE.objectives = Array.from(new Set(
+          STATE.rows.map(x => (x.Objective || '').trim()).filter(Boolean)
+        )).sort((a, b) => a.localeCompare(b));
+        writeCachedData();
+        populateTimelineFilters();
+        renderRoadmapGlance();
+        renderTimeline();
+        renderMetrics();
+      }
+      closeSubmitModal();
+      toast('Changes saved.');
+    } catch (err) {
+      showFormError(err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Save changes';
+    }
+    return;
+  }
+
+  // ── Create mode: append a new idea ─────────────────────────────────────
   const body = {
     token: AUTH.getToken() || 'mock-token',
     objective,
     objectiveIsNew: isNew,
-    what: document.getElementById('fWhat').value.trim(),
-    why:  document.getElementById('fWhy').value.trim(),
-    how:  document.getElementById('fHow').value.trim(),
-    when: whenStr,
-    userFlow: (document.getElementById('fUserFlow') || {}).value.trim()
+    what: fields.What, why: fields.Why, how: fields.How,
+    when: fields.When, userFlow: fields['User Flow'], techTeam: fields['Tech Team']
   };
 
   if (CONFIG.USE_MOCK) {
@@ -1411,7 +1337,6 @@ async function handleSubmit(e) {
     return;
   }
 
-  const btn = document.getElementById('submitFormBtn');
   btn.disabled = true; btn.textContent = 'Submitting…';
   try {
     const data = await jsonpCall({ action: 'submit', ...body });
@@ -1420,11 +1345,11 @@ async function handleSubmit(e) {
     closeSubmitModal();
     celebrateSubmit();
     toast(`Idea submitted (row #${data.rowKey || data.rowNumber}). Thanks!`);
-    fetchData(true); // force-refresh so the new row appears in Timeline immediately
+    fetchData(true);
   } catch (err) {
     showFormError(err.message);
   } finally {
-    btn.disabled = false; btn.textContent = 'Submit to roadmap';
+    btn.disabled = false; btn.textContent = 'Submit idea';
   }
 }
 
