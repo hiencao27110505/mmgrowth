@@ -115,7 +115,10 @@
     <div class="modal-card detail-modal-card" role="dialog" aria-labelledby="detailModalTitle">
       <div class="modal-head">
         <h2 id="detailModalTitle">Initiative</h2>
-        <button class="btn btn-link" data-detail-close>×</button>
+        <div class="modal-head-actions">
+          <button type="button" id="detailCopyBtn" class="btn btn-link copy-btn" title="Copy as prototype prompt">Copy</button>
+          <button class="btn btn-link" data-detail-close>×</button>
+        </div>
       </div>
       <div id="detailModalBody" class="detail-modal-body"></div>
     </div>
@@ -127,7 +130,10 @@
     <div class="modal-card submit-modal-card" role="dialog" aria-labelledby="submitModalTitle">
       <div class="modal-head">
         <h2 id="submitModalTitle">Submit an idea</h2>
-        <button class="btn btn-link" data-submit-close>×</button>
+        <div class="modal-head-actions">
+          <button type="button" id="submitCopyBtn" class="btn btn-link copy-btn" title="Copy as prototype prompt">Copy</button>
+          <button class="btn btn-link" data-submit-close>×</button>
+        </div>
       </div>
       <form id="submitForm" class="idea-form">
         <div class="idea-field-row">

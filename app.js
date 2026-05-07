@@ -158,6 +158,13 @@ function bindUI() {
     });
   });
 
+  // Copy-as-prototype-prompt buttons — submit modal copies live form values,
+  // detail modal copies the read-only row.
+  const submitCopyBtn = document.getElementById('submitCopyBtn');
+  if (submitCopyBtn) submitCopyBtn.addEventListener('click', copyIdeaFromForm);
+  const detailCopyBtn = document.getElementById('detailCopyBtn');
+  if (detailCopyBtn) detailCopyBtn.addEventListener('click', copyIdeaFromCurrentDetail);
+
   // (Timeline filter listeners attached inside populateTimelineFilters —
   // they need to survive each rebuild of the <select> options.)
 
@@ -666,29 +673,43 @@ function renderBacklog() {
     return;
   }
 
-  // Group by Objective so the backlog reads as a triage list, not a flat dump.
-  const byObj = new Map();
+  // Group by When (month) — backlog rows can still have a defined timeline,
+  // so the Backlog tab mirrors the Timeline's column layout. Rows without a
+  // parsable When fall into the "No timeline yet" column.
+  const groups = {};
   backlogRows.forEach(r => {
-    const obj = (r.Objective || '').trim() || '(no objective)';
-    if (!byObj.has(obj)) byObj.set(obj, []);
-    byObj.get(obj).push(r);
+    const key = monthKey(r.When);
+    if (!groups[key]) groups[key] = { label: monthLabel(r.When), rows: [] };
+    groups[key].rows.push(r);
   });
 
-  const objectives = Array.from(byObj.keys()).sort((a, b) => a.localeCompare(b));
-  grid.innerHTML = objectives.map(obj => {
-    const list = byObj.get(obj);
-    return `
-      <section class="backlog-group">
-        <header class="backlog-group-head">
-          <h3 class="backlog-group-title">${escapeHtml(obj)}</h3>
-          <span class="backlog-group-count">${list.length}</span>
-        </header>
-        <div class="backlog-group-cards">
-          ${list.map(initCardHTML).join('')}
-        </div>
-      </section>
-    `;
-  }).join('');
+  const sortedKeys = Object.keys(groups).sort((a, b) => {
+    if (a === 'unscheduled') return 1;
+    if (b === 'unscheduled') return -1;
+    return a.localeCompare(b);
+  });
+
+  grid.innerHTML = `
+    <div class="timeline">
+      ${sortedKeys.map(key => {
+        const g = groups[key];
+        const cls = [
+          g.label.isNow  ? 'is-now'  : '',
+          g.label.isPast ? 'is-past' : ''
+        ].filter(Boolean).join(' ');
+        const suffix = g.label.isNow ? ' · Now' : '';
+        return `
+          <div class="timeline-col ${cls}">
+            <div class="timeline-col-head">
+              <span class="timeline-col-label">${escapeHtml(g.label.text)}${suffix}</span>
+              <span class="timeline-col-count">${g.rows.length}</span>
+            </div>
+            ${g.rows.map(initCardHTML).join('')}
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
 
   bindCardClicks(grid);
 }
@@ -894,6 +915,66 @@ function populateSubmitWhenDropdown() {
     opt.textContent = `${name} 2026`;
     sel.appendChild(opt);
   });
+}
+
+// Build the aggregated prototype-builder prompt text from arbitrary parts.
+// Empty fields are skipped so the prompt stays clean.
+function buildIdeaCopyText(parts) {
+  const order = [
+    ['Objective', parts.objective],
+    ['What',      parts.what],
+    ['Why',       parts.why],
+    ['How',       parts.how],
+    ['User flow', parts.userFlow]
+  ];
+  return order
+    .map(([label, val]) => {
+      const v = String(val || '').trim();
+      return v ? `${label}: ${v}` : '';
+    })
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+async function copyText(text, successMsg) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(successMsg || 'Copied.');
+  } catch (e) {
+    // Fallback for older browsers / non-secure contexts
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); toast(successMsg || 'Copied.'); }
+    catch (_) { toast('Copy failed — select & copy manually.'); }
+    finally { document.body.removeChild(ta); }
+  }
+}
+
+function copyIdeaFromForm() {
+  const text = buildIdeaCopyText({
+    objective: (document.getElementById('fObjective') || {}).value,
+    what:      (document.getElementById('fWhat')      || {}).value,
+    why:       (document.getElementById('fWhy')       || {}).value,
+    how:       (document.getElementById('fHow')       || {}).value,
+    userFlow:  (document.getElementById('fUserFlow')  || {}).value
+  });
+  if (!text) { toast('Nothing to copy yet.'); return; }
+  copyText(text, 'Copied — paste into the prototype builder.');
+}
+
+function copyIdeaFromCurrentDetail() {
+  const r = CURRENT_DETAIL_ROW;
+  if (!r) { toast('Nothing to copy.'); return; }
+  const text = buildIdeaCopyText({
+    objective: r.Objective,
+    what:      r.What,
+    why:       r.Why,
+    how:       r.How,
+    userFlow:  r['User Flow']
+  });
+  if (!text) { toast('Nothing to copy yet.'); return; }
+  copyText(text, 'Copied — paste into the prototype builder.');
 }
 
 function closeSubmitModal() {

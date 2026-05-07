@@ -642,35 +642,7 @@ a:hover { text-decoration: underline; }
 }
 .backlog-sub em { font-style: italic; color: var(--ink-2); }
 
-.backlog-grid { display: flex; flex-direction: column; gap: 24px; }
-.backlog-group {
-  background: var(--white);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 16px 18px;
-}
-.backlog-group-head {
-  display: flex; align-items: baseline; gap: 10px;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
-}
-.backlog-group-title {
-  font-size: 14px; font-weight: 600; color: var(--ink);
-  margin: 0;
-}
-.backlog-group-count {
-  font-size: 11px; color: var(--ink-3);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 1px 8px;
-}
-.backlog-group-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
-}
+.backlog-grid { display: block; }
 
 /* ─── Roadmap at a glance (compact Objective × Month grid) ──────────── */
 .roadmap-glance {
@@ -1092,6 +1064,16 @@ a:hover { text-decoration: underline; }
 .modal-head h2 {
   font-family: 'DM Serif Display', serif; font-size: 22px;
   font-weight: 400; margin: 0; color: var(--ink);
+}
+.modal-head-actions { display: inline-flex; align-items: center; gap: 4px; }
+.copy-btn {
+  font-size: 12px; padding: 4px 10px;
+  border: 1px solid var(--border); border-radius: 999px;
+  color: var(--ink-2);
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.copy-btn:hover {
+  background: var(--momo-light); border-color: var(--momo); color: var(--momo);
 }
 
 /* ─── Form ────────────────────────────────────────────────────────────── */
