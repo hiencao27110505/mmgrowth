@@ -36,7 +36,14 @@ const SYNTH_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour client-side
 const INSIGHTS_ALLOWED = ['hien.cao1@mservice.com.vn'];
 
 // Only these emails can edit cards inline (action=update). Server-side enforced too.
-const EDITORS_ALLOWED = ['hien.cao1@mservice.com.vn'];
+const EDITORS_ALLOWED = [
+  'hien.cao1@mservice.com.vn',
+  'trang.nguyen38@mservice.com.vn',
+  'khanh.ho@mservice.com.vn',
+  'hao.tang1@mservice.com.vn',
+  'phuong.nguyen51@mservice.com.vn',
+  'toan.tran1@mservice.com.vn'
+];
 
 // ─── Boot ───────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
@@ -928,6 +935,7 @@ function prefillSubmitForm(r) {
   set('fWhy',       r.Why);
   set('fHow',       r.How);
   set('fUserFlow',  r['User Flow']);
+  set('fPrototype', r.Prototype);
   set('fStatus',    (r.Status || 'Backlog'));
 
   const parsed = parseWhenToMonth(r.When);
@@ -1457,6 +1465,7 @@ async function handleSubmit(e) {
     How:       document.getElementById('fHow').value.trim(),
     When:      whenStr,
     'User Flow': (document.getElementById('fUserFlow') || {}).value.trim(),
+    Prototype: (document.getElementById('fPrototype') || {}).value.trim(),
     Tech: Array.from(document.querySelectorAll('#fTechTeams input[name="techTeam"]:checked'))
       .map(cb => cb.value).join(', ')
   };
@@ -1526,7 +1535,7 @@ async function handleSubmit(e) {
     objectiveIsNew: isNew,
     what: fields.What, why: fields.Why, how: fields.How,
     when: fields.When, userFlow: fields['User Flow'], tech: fields.Tech,
-    status: fields.Status
+    status: fields.Status, prototype: fields.Prototype
   };
 
   if (CONFIG.USE_MOCK) {
