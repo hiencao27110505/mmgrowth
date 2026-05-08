@@ -905,6 +905,7 @@ function openSubmitModal(row) {
   modal.hidden = false;
   document.body.style.overflow = 'hidden';
   populateSubmitWhenDropdown();
+  populateOwnerDatalist();
   resetSubmitForm();
 
   // Adapt the modal's title and primary button based on mode
@@ -936,6 +937,7 @@ function prefillSubmitForm(r) {
   set('fHow',       r.How);
   set('fUserFlow',  r['User Flow']);
   set('fPrototype', r.Prototype);
+  set('fOwner',     r.Who);
   set('fStatus',    (r.Status || 'Backlog'));
 
   const parsed = parseWhenToMonth(r.When);
@@ -948,6 +950,19 @@ function prefillSubmitForm(r) {
 
   // Refresh the live writing-rules indicators against the prefilled values
   if (typeof renderChecklists === 'function') renderChecklists();
+}
+
+// Populate the Owner combobox suggestions from distinct existing values, so
+// editors can pick a teammate fast or type a brand-new name.
+function populateOwnerDatalist() {
+  const list = document.getElementById('ownerSuggestions');
+  if (!list) return;
+  const owners = Array.from(new Set(
+    STATE.rows.map(r => (r.Who || '').trim()).filter(Boolean)
+  )).sort((a, b) => a.localeCompare(b));
+  list.innerHTML = owners
+    .map(o => `<option value="${escapeAttr(o)}"></option>`)
+    .join('');
 }
 
 // Fill the "When" dropdown in the submit modal with the 12 months of 2026,
@@ -1466,6 +1481,7 @@ async function handleSubmit(e) {
     When:      whenStr,
     'User Flow': (document.getElementById('fUserFlow') || {}).value.trim(),
     Prototype: (document.getElementById('fPrototype') || {}).value.trim(),
+    Who: (document.getElementById('fOwner') || {}).value.trim(),
     Tech: Array.from(document.querySelectorAll('#fTechTeams input[name="techTeam"]:checked'))
       .map(cb => cb.value).join(', ')
   };
@@ -1535,7 +1551,7 @@ async function handleSubmit(e) {
     objectiveIsNew: isNew,
     what: fields.What, why: fields.Why, how: fields.How,
     when: fields.When, userFlow: fields['User Flow'], tech: fields.Tech,
-    status: fields.Status, prototype: fields.Prototype
+    status: fields.Status, prototype: fields.Prototype, who: fields.Who
   };
 
   if (CONFIG.USE_MOCK) {
