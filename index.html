@@ -202,16 +202,22 @@
             <datalist id="ownerSuggestions"></datalist>
           </div>
           <div class="idea-field" style="flex: 2;">
-            <label class="idea-label">Tech team <span class="idea-label-hint">· one or more</span></label>
-            <div class="idea-chip-group" id="fTechTeams" role="group" aria-label="Tech team in charge">
-              <label class="idea-chip"><input type="checkbox" name="techTeam" value="App Core Service"><span>App Core Service</span></label>
-              <label class="idea-chip"><input type="checkbox" name="techTeam" value="Backend Auth"><span>Backend Auth</span></label>
-              <label class="idea-chip"><input type="checkbox" name="techTeam" value="Backend Core"><span>Backend Core</span></label>
-              <label class="idea-chip"><input type="checkbox" name="techTeam" value="Miniapp Activation"><span>Miniapp Activation</span></label>
-              <label class="idea-chip"><input type="checkbox" name="techTeam" value="Miniapp Bank"><span>Miniapp Bank</span></label>
-              <label class="idea-chip"><input type="checkbox" name="techTeam" value="Miniapp KYC"><span>Miniapp KYC</span></label>
-              <label class="idea-chip"><input type="checkbox" name="techTeam" value="Backend Profile"><span>Backend Profile</span></label>
-              <label class="idea-chip"><input type="checkbox" name="techTeam" value="Backend SOF"><span>Backend SOF</span></label>
+            <label class="idea-label" for="fTechTrigger">Tech team <span class="idea-label-hint">· one or more</span></label>
+            <div class="multi-picker" id="fTechTeams">
+              <button type="button" id="fTechTrigger" class="multi-picker-trigger" aria-haspopup="listbox" aria-expanded="false">
+                <span class="multi-picker-value" data-empty-text="Pick teams…"></span>
+                <span class="multi-picker-caret" aria-hidden="true">▾</span>
+              </button>
+              <div class="multi-picker-menu" hidden role="listbox" aria-multiselectable="true">
+                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="App Core Service"><span>App Core Service</span></label>
+                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="Backend Auth"><span>Backend Auth</span></label>
+                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="Backend Core"><span>Backend Core</span></label>
+                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="Miniapp Activation"><span>Miniapp Activation</span></label>
+                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="Miniapp Bank"><span>Miniapp Bank</span></label>
+                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="Miniapp KYC"><span>Miniapp KYC</span></label>
+                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="Backend Profile"><span>Backend Profile</span></label>
+                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="Backend SOF"><span>Backend SOF</span></label>
+              </div>
             </div>
           </div>
         </div>

@@ -906,6 +906,7 @@ function openSubmitModal(row) {
   document.body.style.overflow = 'hidden';
   populateSubmitWhenDropdown();
   populateOwnerDatalist();
+  wireTechPicker();
   resetSubmitForm();
 
   // Adapt the modal's title and primary button based on mode
@@ -947,9 +948,68 @@ function prefillSubmitForm(r) {
   document.querySelectorAll('#fTechTeams input[name="techTeam"]').forEach(cb => {
     cb.checked = teams.includes(cb.value);
   });
+  if (typeof renderTechPickerValue === 'function') renderTechPickerValue();
 
   // Refresh the live writing-rules indicators against the prefilled values
   if (typeof renderChecklists === 'function') renderChecklists();
+}
+
+// ── Tech-team multi-select picker ──────────────────────────────────────
+// A clickable trigger renders selected values as inline chips; clicking it
+// opens a dropdown of checkboxes. The underlying checkboxes preserve the
+// existing handleSubmit data flow (querySelectorAll on :checked).
+let TECH_PICKER_WIRED = false;
+function wireTechPicker() {
+  if (TECH_PICKER_WIRED) return;
+  TECH_PICKER_WIRED = true;
+
+  const root    = document.getElementById('fTechTeams');
+  const trigger = document.getElementById('fTechTrigger');
+  if (!root || !trigger) return;
+  const menu    = root.querySelector('.multi-picker-menu');
+
+  function close() {
+    menu.hidden = true;
+    trigger.setAttribute('aria-expanded', 'false');
+    root.classList.remove('is-open');
+  }
+  function open() {
+    menu.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+    root.classList.add('is-open');
+  }
+  trigger.addEventListener('click', () => {
+    if (menu.hidden) open(); else close();
+  });
+  // Close on outside click — bound once, ignores clicks inside the picker.
+  document.addEventListener('click', (e) => {
+    if (root.contains(e.target)) return;
+    close();
+  });
+  // Re-render the trigger label on every checkbox change.
+  root.querySelectorAll('input[name="techTeam"]').forEach(cb => {
+    cb.addEventListener('change', renderTechPickerValue);
+  });
+  // Esc closes when focus is inside the picker.
+  root.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+}
+
+// Render selected checkboxes as small chips inside the trigger; show
+// the placeholder when nothing is selected.
+function renderTechPickerValue() {
+  const root = document.getElementById('fTechTeams');
+  if (!root) return;
+  const valEl = root.querySelector('.multi-picker-value');
+  const checked = Array.from(root.querySelectorAll('input[name="techTeam"]:checked'));
+  if (checked.length === 0) {
+    valEl.textContent = valEl.dataset.emptyText || 'Pick…';
+    valEl.classList.add('is-placeholder');
+    return;
+  }
+  valEl.classList.remove('is-placeholder');
+  valEl.innerHTML = checked
+    .map(cb => `<span class="multi-picker-chip">${escapeHtml(cb.value)}</span>`)
+    .join('');
 }
 
 // Populate the Owner combobox suggestions from distinct existing values, so
@@ -1342,6 +1402,8 @@ function resetSubmitForm() {
   document.getElementById('formError').hidden = true;
   document.querySelectorAll('#submitForm .has-error').forEach(el => el.classList.remove('has-error'));
   document.querySelectorAll('.quality-list.show-failed').forEach(el => el.classList.remove('show-failed'));
+  // form.reset() restores checkbox defaults — re-render the picker label
+  if (typeof renderTechPickerValue === 'function') renderTechPickerValue();
   // Collapse all rules toggles back to closed
   document.querySelectorAll('.idea-rules-toggle[aria-expanded="true"]').forEach(t => {
     t.setAttribute('aria-expanded', 'false');

@@ -756,28 +756,64 @@ a:hover { text-decoration: underline; }
   .idea-field-row { flex-direction: column; gap: 16px; }
 }
 
-/* Multi-select chip group (e.g. Tech team in charge) */
-.idea-chip-group {
-  display: flex; flex-wrap: wrap; gap: 6px;
+/* Multi-select picker — input-styled trigger + dropdown popover. Used by
+   Tech team. Selected values render as inline chips inside the trigger. */
+.multi-picker { position: relative; }
+.multi-picker-trigger {
+  width: 100%; box-sizing: border-box;
+  font: inherit; font-size: 14px; color: var(--ink);
+  text-align: left; cursor: pointer;
+  padding: 6px 32px 6px 8px;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--white);
+  display: flex; align-items: center; min-height: 38px;
 }
-.idea-chip {
-  display: inline-flex; align-items: center; cursor: pointer;
-  font-size: 12px; line-height: 1.2; color: var(--ink-2);
-  padding: 6px 10px;
+.multi-picker.is-open .multi-picker-trigger,
+.multi-picker-trigger:focus {
+  outline: none; border-color: var(--momo);
+  box-shadow: 0 0 0 3px var(--momo-light);
+}
+.multi-picker-value {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  flex: 1; min-width: 0;
+}
+.multi-picker-value.is-placeholder {
+  color: var(--ink-3); font-size: 14px;
+}
+.multi-picker-chip {
+  display: inline-flex; align-items: center;
+  font-size: 12px; line-height: 1.2;
+  padding: 3px 8px;
+  background: var(--momo-light); color: var(--momo);
+  border-radius: 999px;
+}
+.multi-picker-caret {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  font-size: 10px; color: var(--ink-3);
+  transition: transform 0.12s ease;
+  pointer-events: none;
+}
+.multi-picker.is-open .multi-picker-caret { transform: translateY(-50%) rotate(180deg); }
+
+.multi-picker-menu {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px);
   background: var(--white);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(26, 17, 23, 0.12);
+  padding: 4px;
+  max-height: 260px; overflow-y: auto;
+  z-index: 10;
+}
+.multi-picker-option {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  font-size: 13px; color: var(--ink-2);
+  padding: 7px 10px; border-radius: 4px;
   user-select: none;
 }
-.idea-chip input { position: absolute; opacity: 0; pointer-events: none; }
-.idea-chip:hover { border-color: var(--ink-3); color: var(--ink); }
-.idea-chip:has(input:checked) {
-  background: var(--momo-light);
-  border-color: var(--momo);
-  color: var(--momo);
-  font-weight: 500;
-}
+.multi-picker-option:hover { background: var(--surface); color: var(--ink); }
+.multi-picker-option input { accent-color: var(--momo); margin: 0; }
+.multi-picker-option:has(input:checked) { color: var(--momo); font-weight: 500; }
 
 /* Label + rules-toggle on the same row */
 .idea-label-row {
