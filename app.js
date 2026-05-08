@@ -938,6 +938,7 @@ function prefillSubmitForm(r) {
   set('fHow',       r.How);
   set('fUserFlow',  r['User Flow']);
   set('fPrototype', r.Prototype);
+  set('fConfluence', r.Confluence);
   set('fOwner',     r.Who);
   set('fStatus',    (r.Status || 'Backlog'));
 
@@ -1547,6 +1548,7 @@ async function handleSubmit(e) {
     When:      whenStr,
     'User Flow': (document.getElementById('fUserFlow') || {}).value.trim(),
     Prototype: (document.getElementById('fPrototype') || {}).value.trim(),
+    Confluence: (document.getElementById('fConfluence') || {}).value.trim(),
     Who: (document.getElementById('fOwner') || {}).value.trim(),
     Tech: Array.from(document.querySelectorAll('#fTechTeams input[name="techTeam"]:checked'))
       .map(cb => cb.value).join(', ')
@@ -1617,7 +1619,8 @@ async function handleSubmit(e) {
     objectiveIsNew: isNew,
     what: fields.What, why: fields.Why, how: fields.How,
     when: fields.When, userFlow: fields['User Flow'], tech: fields.Tech,
-    status: fields.Status, prototype: fields.Prototype, who: fields.Who
+    status: fields.Status, prototype: fields.Prototype, who: fields.Who,
+    confluence: fields.Confluence
   };
 
   if (CONFIG.USE_MOCK) {
