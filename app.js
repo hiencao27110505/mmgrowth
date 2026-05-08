@@ -429,7 +429,7 @@ function populateTimelineFilters() {
   const qSel      = document.getElementById('filterQuality');
   if (objectiveSel) {
     const cur = STATE.filters.objective;
-    objectiveSel.innerHTML = '<option value="">All</option>' +
+    objectiveSel.innerHTML = '<option value="">Objective</option>' +
       STATE.objectives.map(o => `<option value="${escapeAttr(o)}">${escapeHtml(o)}</option>`).join('');
     if (STATE.objectives.includes(cur)) objectiveSel.value = cur;
     else { objectiveSel.value = ''; STATE.filters.objective = ''; }
@@ -437,7 +437,7 @@ function populateTimelineFilters() {
   }
   if (ownerSel) {
     const cur = STATE.filters.owner;
-    ownerSel.innerHTML = '<option value="">All</option>' +
+    ownerSel.innerHTML = '<option value="">Owner</option>' +
       owners.map(o => `<option value="${escapeAttr(o)}">${escapeHtml(o)}</option>`).join('');
     // Keep selection if the current owner still exists, otherwise reset.
     if (owners.includes(cur)) ownerSel.value = cur;
@@ -448,7 +448,7 @@ function populateTimelineFilters() {
   }
   if (statusSel) {
     const cur = STATE.filters.status;
-    statusSel.innerHTML = '<option value="">All</option>' +
+    statusSel.innerHTML = '<option value="">Status</option>' +
       statuses.map(s => `<option value="${escapeAttr(s)}">${escapeHtml(s)}</option>`).join('');
     if (statuses.includes(cur)) statusSel.value = cur;
     else { statusSel.value = ''; STATE.filters.status = ''; }
@@ -464,7 +464,7 @@ function populateTimelineFilters() {
     });
     const techs = Array.from(techSet).sort((a, b) => a.localeCompare(b));
     const cur = STATE.filters.tech;
-    techSel.innerHTML = '<option value="">All</option>' +
+    techSel.innerHTML = '<option value="">Tech</option>' +
       techs.map(t => `<option value="${escapeAttr(t)}">${escapeHtml(t)}</option>`).join('');
     if (techs.includes(cur)) techSel.value = cur;
     else { techSel.value = ''; STATE.filters.tech = ''; }

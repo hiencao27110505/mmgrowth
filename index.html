@@ -53,30 +53,15 @@
       <section id="view-timeline" class="view">
         <section id="roadmapGlance" class="roadmap-glance" hidden></section>
         <div class="filter-bar" id="timelineFilters">
-          <label class="filter-pill">
-            <span class="filter-label">Objective</span>
-            <select id="filterObjective"><option value="">All</option></select>
-          </label>
-          <label class="filter-pill">
-            <span class="filter-label">Owner</span>
-            <select id="filterOwner"><option value="">All</option></select>
-          </label>
-          <label class="filter-pill">
-            <span class="filter-label">Status</span>
-            <select id="filterStatus"><option value="">All</option></select>
-          </label>
-          <label class="filter-pill">
-            <span class="filter-label">Tech</span>
-            <select id="filterTech"><option value="">All</option></select>
-          </label>
-          <label class="filter-pill">
-            <span class="filter-label">Card quality</span>
-            <select id="filterQuality">
-              <option value="">All</option>
-              <option value="complete">Complete · all fields filled</option>
-              <option value="gaps">Has gaps · missing 1+ field</option>
-            </select>
-          </label>
+          <select id="filterObjective" class="filter-select" aria-label="Objective"><option value="">Objective</option></select>
+          <select id="filterOwner"     class="filter-select" aria-label="Owner"><option value="">Owner</option></select>
+          <select id="filterStatus"    class="filter-select" aria-label="Status"><option value="">Status</option></select>
+          <select id="filterTech"      class="filter-select" aria-label="Tech"><option value="">Tech</option></select>
+          <select id="filterQuality"   class="filter-select" aria-label="Card quality">
+            <option value="">Card quality</option>
+            <option value="complete">Complete · all fields filled</option>
+            <option value="gaps">Has gaps · missing 1+ field</option>
+          </select>
           <button id="clearFiltersBtn" class="btn btn-link" hidden>Clear filters</button>
           <span id="filterCount" class="filter-count" hidden></span>
         </div>
