@@ -117,13 +117,8 @@
   <div id="submitModal" class="modal" hidden>
     <div class="modal-backdrop" data-submit-close></div>
     <div class="modal-card submit-modal-card" role="dialog" aria-labelledby="submitModalTitle">
-      <div class="modal-head">
-        <h2 id="submitModalTitle">Submit an idea</h2>
-        <div class="modal-head-actions">
-          <button type="button" id="submitCopyBtn" class="btn btn-link copy-btn" title="Copy as prototype prompt">Copy</button>
-          <button class="btn btn-link" data-submit-close>×</button>
-        </div>
-      </div>
+      <h2 id="submitModalTitle" class="visually-hidden">Submit an idea</h2>
+      <button class="modal-close-floating" data-submit-close aria-label="Close">×</button>
       <form id="submitForm" class="idea-form">
         <div class="idea-field-row">
           <div class="idea-field" style="flex: 2;">
@@ -150,6 +145,36 @@
             <select id="fWhen" name="fWhen">
               <option value="">— No month —</option>
             </select>
+          </div>
+        </div>
+
+        <div class="idea-field-row">
+          <div class="idea-field" style="flex: 1;">
+            <label class="idea-label" for="fOwner">Owner</label>
+            <input id="fOwner" name="fOwner" type="text"
+                   list="ownerSuggestions"
+                   placeholder="Pick or type a name"
+                   autocomplete="off" />
+            <datalist id="ownerSuggestions"></datalist>
+          </div>
+          <div class="idea-field" style="flex: 2;">
+            <label class="idea-label" for="fTechTrigger">Tech team <span class="idea-label-hint">· one or more</span></label>
+            <div class="multi-picker" id="fTechTeams">
+              <button type="button" id="fTechTrigger" class="multi-picker-trigger" aria-haspopup="listbox" aria-expanded="false">
+                <span class="multi-picker-value" data-empty-text="Pick teams…"></span>
+                <span class="multi-picker-caret" aria-hidden="true">▾</span>
+              </button>
+              <div class="multi-picker-menu" hidden role="listbox" aria-multiselectable="true">
+                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="App Core Service"><span>App Core Service</span></label>
+                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="Backend Auth"><span>Backend Auth</span></label>
+                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="Backend Core"><span>Backend Core</span></label>
+                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="Miniapp Activation"><span>Miniapp Activation</span></label>
+                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="Miniapp Bank"><span>Miniapp Bank</span></label>
+                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="Miniapp KYC"><span>Miniapp KYC</span></label>
+                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="Backend Profile"><span>Backend Profile</span></label>
+                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="Backend SOF"><span>Backend SOF</span></label>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -192,36 +217,6 @@
           <textarea id="fHow" rows="2" required placeholder="e.g. Detect NFC-capable phones, offer NFC as primary path."></textarea>
         </div>
 
-        <div class="idea-field-row">
-          <div class="idea-field" style="flex: 1;">
-            <label class="idea-label" for="fOwner">Owner</label>
-            <input id="fOwner" name="fOwner" type="text"
-                   list="ownerSuggestions"
-                   placeholder="Pick or type a name"
-                   autocomplete="off" />
-            <datalist id="ownerSuggestions"></datalist>
-          </div>
-          <div class="idea-field" style="flex: 2;">
-            <label class="idea-label" for="fTechTrigger">Tech team <span class="idea-label-hint">· one or more</span></label>
-            <div class="multi-picker" id="fTechTeams">
-              <button type="button" id="fTechTrigger" class="multi-picker-trigger" aria-haspopup="listbox" aria-expanded="false">
-                <span class="multi-picker-value" data-empty-text="Pick teams…"></span>
-                <span class="multi-picker-caret" aria-hidden="true">▾</span>
-              </button>
-              <div class="multi-picker-menu" hidden role="listbox" aria-multiselectable="true">
-                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="App Core Service"><span>App Core Service</span></label>
-                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="Backend Auth"><span>Backend Auth</span></label>
-                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="Backend Core"><span>Backend Core</span></label>
-                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="Miniapp Activation"><span>Miniapp Activation</span></label>
-                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="Miniapp Bank"><span>Miniapp Bank</span></label>
-                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="Miniapp KYC"><span>Miniapp KYC</span></label>
-                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="Backend Profile"><span>Backend Profile</span></label>
-                <label class="multi-picker-option"><input type="checkbox" name="techTeam" value="Backend SOF"><span>Backend SOF</span></label>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <div class="idea-field">
           <label class="idea-label" for="fUserFlow">User flow</label>
           <textarea id="fUserFlow" rows="4" placeholder="e.g. 1) Open MoMo → 2) Tap eKYC → 3) Detect NFC chip → 4) Prompt to tap CCCD on back of phone → 5) Read chip → 6) Confirm identity → 7) Return to home with verified badge"></textarea>
@@ -237,6 +232,7 @@
         <div class="idea-form-foot">
           <span class="idea-meta-inline">As <strong id="submitterEmail"></strong></span>
           <div class="idea-form-actions">
+            <button type="button" id="submitCopyBtn" class="btn btn-link copy-link" title="Copy as prototype prompt">Copy</button>
             <button type="button" class="btn btn-link" data-submit-close>Cancel</button>
             <button type="submit" class="btn btn-primary" id="submitFormBtn">Submit idea</button>
           </div>

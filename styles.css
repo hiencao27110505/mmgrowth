@@ -716,7 +716,7 @@ a:hover { text-decoration: underline; }
 
 /* ─── Submit-an-idea modal (Timeline header → popup) ─────────────────── */
 .submit-modal-card { max-width: 580px; }
-.idea-form { padding: 4px 28px 20px; }
+.idea-form { padding: 24px 28px 20px; }
 
 /* Field block — label + control */
 .idea-field { margin-bottom: 16px; flex: 1; min-width: 0; }
@@ -737,15 +737,20 @@ a:hover { text-decoration: underline; }
 .idea-field-row .idea-field { margin-bottom: 0; }
 
 .idea-form input[type="text"],
+.idea-form input[type="url"],
+.idea-form input[type="email"],
 .idea-form select,
 .idea-form textarea {
   width: 100%; box-sizing: border-box;
   font: inherit; font-size: 14px; color: var(--ink);
-  padding: 9px 12px; border: 1px solid var(--border); border-radius: 6px;
+  padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px;
   background: var(--white); line-height: 1.5;
+  min-height: 38px;
 }
 .idea-form textarea { resize: vertical; min-height: 44px; }
 .idea-form input[type="text"]:focus,
+.idea-form input[type="url"]:focus,
+.idea-form input[type="email"]:focus,
 .idea-form select:focus,
 .idea-form textarea:focus {
   outline: none; border-color: var(--momo);
@@ -763,10 +768,14 @@ a:hover { text-decoration: underline; }
   width: 100%; box-sizing: border-box;
   font: inherit; font-size: 14px; color: var(--ink);
   text-align: left; cursor: pointer;
-  padding: 6px 32px 6px 8px;
+  padding: 8px 32px 8px 12px;
   border: 1px solid var(--border); border-radius: 6px;
   background: var(--white);
-  display: flex; align-items: center; min-height: 38px;
+  display: flex; align-items: center;
+  /* Locked height — chips never wrap, never grow with selection length. */
+  height: 38px; min-height: 38px;
+  overflow: hidden;
+  position: relative;
 }
 .multi-picker.is-open .multi-picker-trigger,
 .multi-picker-trigger:focus {
@@ -774,8 +783,17 @@ a:hover { text-decoration: underline; }
   box-shadow: 0 0 0 3px var(--momo-light);
 }
 .multi-picker-value {
-  display: flex; flex-wrap: wrap; gap: 4px;
+  display: flex; flex-wrap: nowrap; gap: 4px; align-items: center;
   flex: 1; min-width: 0;
+  overflow: hidden; white-space: nowrap;
+}
+.multi-picker-chip {
+  flex-shrink: 0;
+  max-width: 140px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.multi-picker-more {
+  flex-shrink: 0; font-size: 12px; color: var(--ink-3); font-weight: 600;
 }
 .multi-picker-value.is-placeholder {
   color: var(--ink-3); font-size: 14px;
@@ -786,6 +804,9 @@ a:hover { text-decoration: underline; }
   padding: 3px 8px;
   background: var(--momo-light); color: var(--momo);
   border-radius: 999px;
+  flex-shrink: 0;
+  max-width: 140px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .multi-picker-caret {
   position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
@@ -1098,6 +1119,36 @@ a:hover { text-decoration: underline; }
   font-weight: 400; margin: 0; color: var(--ink);
 }
 .modal-head-actions { display: inline-flex; align-items: center; gap: 4px; }
+/* Subtle inline link variant — used in the form footer */
+.copy-link {
+  font-size: 12px; color: var(--ink-3); padding: 4px 6px;
+  margin-right: auto;
+  transition: color 0.12s ease;
+}
+.copy-link:hover { color: var(--momo); }
+
+/* Floating close button — sits in the top-right corner of a modal card
+   when the dedicated header bar is removed. */
+.modal-close-floating {
+  position: absolute; top: 8px; right: 10px;
+  width: 28px; height: 28px;
+  background: transparent; border: 0; cursor: pointer;
+  font-size: 22px; line-height: 1; color: var(--ink-3);
+  border-radius: 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  z-index: 2;
+}
+.modal-close-floating:hover { background: var(--surface); color: var(--ink); }
+
+/* a11y utility — visually hide while keeping for screen readers */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0);
+  white-space: nowrap; border: 0;
+}
+
 .copy-btn {
   font-size: 12px; padding: 4px 10px;
   border: 1px solid var(--border); border-radius: 999px;

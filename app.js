@@ -994,8 +994,9 @@ function wireTechPicker() {
   root.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
 }
 
-// Render selected checkboxes as small chips inside the trigger; show
-// the placeholder when nothing is selected.
+// Render selected checkboxes as small chips inside the trigger. The trigger
+// has a fixed height — show the first 2 chips inline and collapse the rest
+// into a "+N" indicator so the field never grows with selection length.
 function renderTechPickerValue() {
   const root = document.getElementById('fTechTeams');
   if (!root) return;
@@ -1007,9 +1008,12 @@ function renderTechPickerValue() {
     return;
   }
   valEl.classList.remove('is-placeholder');
-  valEl.innerHTML = checked
-    .map(cb => `<span class="multi-picker-chip">${escapeHtml(cb.value)}</span>`)
-    .join('');
+  const VISIBLE = 2;
+  const visible = checked.slice(0, VISIBLE);
+  const overflow = checked.length - visible.length;
+  valEl.innerHTML =
+    visible.map(cb => `<span class="multi-picker-chip">${escapeHtml(cb.value)}</span>`).join('') +
+    (overflow > 0 ? `<span class="multi-picker-more">+${overflow}</span>` : '');
 }
 
 // Populate the Owner combobox suggestions from distinct existing values, so
