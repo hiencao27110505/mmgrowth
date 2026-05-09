@@ -26,6 +26,9 @@ window.AUTH = (function () {
   let onUnauthorized = null;
   let refreshTimer = null;
   let gisInitialized = false;
+  // When refreshToken() is called, we stash the resolver here so the next
+  // GIS credential callback can settle it. Coalesces concurrent callers.
+  let pendingRefresh = null;
 
   function init(opts) {
     clientId = opts.clientId;
@@ -148,9 +151,46 @@ window.AUTH = (function () {
       }));
       if (isFirstSignIn && onAuthorized) onAuthorized(email, idToken);
       scheduleSilentRefresh(REFRESH_PERIOD);
+      // Settle any in-flight refreshToken() awaiter
+      if (pendingRefresh) {
+        const p = pendingRefresh; pendingRefresh = null;
+        p.resolve(idToken);
+      }
     } catch (err) {
+      if (pendingRefresh) {
+        const p = pendingRefresh; pendingRefresh = null;
+        p.reject(err);
+      }
       if (onUnauthorized) onUnauthorized('Could not parse credential');
     }
+  }
+
+  // On-demand silent refresh. Returns a Promise that resolves with the new
+  // ID token, or rejects if GIS can't issue one without interaction (e.g.
+  // the Google session itself ended). Callers should fall back to a hard
+  // sign-in prompt on rejection.
+  function refreshToken(timeoutMs) {
+    timeoutMs = timeoutMs || 6000;
+    if (pendingRefresh) return pendingRefresh.promise; // coalesce
+    let resolve, reject;
+    const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+    pendingRefresh = { promise, resolve, reject };
+    const timer = setTimeout(() => {
+      if (!pendingRefresh) return;
+      const p = pendingRefresh; pendingRefresh = null;
+      p.reject(new Error('refresh timeout'));
+    }, timeoutMs);
+    promise.finally(() => clearTimeout(timer));
+    ensureGISReady(() => {
+      try { google.accounts.id.prompt(); }
+      catch (e) {
+        if (pendingRefresh) {
+          const p = pendingRefresh; pendingRefresh = null;
+          p.reject(e);
+        }
+      }
+    });
+    return promise;
   }
 
   // Called by app.js when the backend rejects our token (e.g., expired or revoked).
@@ -181,5 +221,5 @@ window.AUTH = (function () {
     location.reload();
   }
 
-  return { init, getToken, getEmail, signOut, clearCachedToken };
+  return { init, getToken, getEmail, signOut, clearCachedToken, refreshToken };
 })();

@@ -292,6 +292,26 @@ function relativeTime(ms) {
   return Math.floor(hr / 24) + ' d ago';
 }
 
+// Wrapper around jsonpCall that automatically refreshes an expired Google
+// ID token and retries once. Use for write paths so editors don't get the
+// raw "invalid token" error after sitting idle past the 1-hour JWT expiry.
+async function jsonpCallWithReauth(params) {
+  const first = await jsonpCall(params);
+  if (first && first.ok) return first;
+  const err = String((first && first.error) || '');
+  const looksAuth = /invalid token|missing token|bad audience|email not verified/i.test(err);
+  if (!looksAuth) return first;
+  toast('Session expired — refreshing…');
+  let newToken;
+  try { newToken = await AUTH.refreshToken(); }
+  catch (_) {
+    toast('Could not refresh session. Please sign in again.', true);
+    AUTH.signOut();
+    return first;
+  }
+  return jsonpCall({ ...params, token: newToken });
+}
+
 function jsonpCall(params) {
   return new Promise((resolve, reject) => {
     const cbName = '__jsonp_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
@@ -1581,7 +1601,7 @@ async function handleSubmit(e) {
 
     btn.disabled = true; btn.textContent = 'Saving…';
     try {
-      const data = await jsonpCall({
+      const data = await jsonpCallWithReauth({
         action: 'update',
         token:  AUTH.getToken(),
         rowKey: String(rowKey),
@@ -1634,7 +1654,7 @@ async function handleSubmit(e) {
 
   btn.disabled = true; btn.textContent = 'Submitting…';
   try {
-    const data = await jsonpCall({ action: 'submit', ...body });
+    const data = await jsonpCallWithReauth({ action: 'submit', ...body });
     if (!data.ok) throw new Error(data.error || 'submit failed');
     resetSubmitForm();
     closeSubmitModal();
