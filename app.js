@@ -510,6 +510,7 @@ function populateTimelineFilters() {
     if (techSel)      techSel.value      = '';
     if (qSel)         qSel.value         = '';
     updateClearFiltersBtn();
+    renderRoadmapGlance();
     renderTimeline();
   };
   updateClearFiltersBtn();
