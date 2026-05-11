@@ -949,6 +949,16 @@ function openSubmitModal(row) {
   const looksLikeRow = row && typeof row === 'object' && !(row instanceof Event)
     && (('What' in row) || ('Objective' in row) || ('#' in row));
   CURRENT_EDIT_ROW = looksLikeRow ? row : null;
+
+  // Pre-check: if the cached Google ID token is about to expire (or already
+  // has), trigger a silent refresh BEFORE the user invests time typing. The
+  // modal still opens immediately; if the refresh fails we sign them out.
+  if (!CONFIG.USE_MOCK && AUTH && AUTH.isTokenFresh && !AUTH.isTokenFresh(120)) {
+    AUTH.refreshToken().catch(() => {
+      toast('Could not refresh session. Please sign in again.', true);
+      AUTH.signOut();
+    });
+  }
   const modal = document.getElementById('submitModal');
   if (!modal) return;
   modal.hidden = false;

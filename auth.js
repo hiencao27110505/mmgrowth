@@ -6,7 +6,7 @@
  *   - Google's own ID tokens carry a ~1h `exp`; we can't extend that.
  *   - We keep an APP-LEVEL session window of 30 days, anchored to the
  *     original sign-in. While inside that window we silently refresh the
- *     token via GIS auto_select (no user click) every ~5 min, so the
+ *     token via GIS auto_select (no user click) every ~55 min, so the
  *     cached token stays accepted by the backend.
  *   - If the user's Google session itself ends inside that 30 days, the
  *     silent refresh will fail and we fall back to the interactive sign-in
@@ -18,7 +18,7 @@
 window.AUTH = (function () {
   const STORAGE_KEY    = 'roadmap_idToken_v1';
   const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 d "stay signed in" window
-  const REFRESH_PERIOD = 5 * 60 * 1000;             // refresh every 5 min
+  const REFRESH_PERIOD = 55 * 60 * 1000;            // refresh every 55 min
 
   let idToken = null;
   let email = null;
@@ -214,6 +214,19 @@ window.AUTH = (function () {
   function getToken() { return idToken; }
   function getEmail() { return email; }
 
+  // Returns true if the current cached JWT still has more than `bufferSec`
+  // seconds left before expiry. Callers can use this to pre-refresh before
+  // a write so the request doesn't fail mid-flight.
+  function isTokenFresh(bufferSec) {
+    if (bufferSec == null) bufferSec = 60;
+    if (!idToken) return false;
+    try {
+      const claims = parseJwt(idToken);
+      const nowSec = Math.floor(Date.now() / 1000);
+      return !!(claims.exp && claims.exp - bufferSec > nowSec);
+    } catch (_) { return false; }
+  }
+
   function signOut() {
     clearCachedToken();
     if (window.google && google.accounts && google.accounts.id) {
@@ -222,5 +235,5 @@ window.AUTH = (function () {
     location.reload();
   }
 
-  return { init, getToken, getEmail, signOut, clearCachedToken, refreshToken };
+  return { init, getToken, getEmail, signOut, clearCachedToken, refreshToken, isTokenFresh };
 })();
