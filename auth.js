@@ -47,16 +47,10 @@ window.AUTH = (function () {
       return;
     }
 
-    if (cached) {
-      // Inside 24h window but JWT is stale → attempt silent re-auth before
-      // surfacing any sign-in UI. If silent fails GIS will show the button.
-      ensureGISReady(() => {
-        google.accounts.id.prompt(); // auto_select handles the silent path
-      });
-      return;
-    }
-
-    // No usable cache → full interactive flow
+    // For BOTH stale-cache and no-cache paths, always render the button as
+    // a fallback. Calling prompt() will silently sign in when possible; if
+    // it can't, the button is there to click. Without this fallback, a
+    // failed silent prompt leaves the gate blank with no escape hatch.
     ensureGISReady(() => {
       google.accounts.id.renderButton(
         document.getElementById('googleBtn'),
