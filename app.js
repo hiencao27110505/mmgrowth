@@ -629,6 +629,34 @@ function renderRoadmapGlance() {
   });
 }
 
+// Shared 3-bucket window used by both Timeline and Backlog tabs:
+//   [previous month] [current month] [next month + everything later]
+// Returns column descriptors + a function that maps a row's When to a
+// bucket key. Rows before the previous month are dropped; "unscheduled"
+// is returned as its own bucket so the Backlog tab can keep its column.
+function timelineWindow() {
+  const today = new Date();
+  const prevD = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const curD  = new Date(today.getFullYear(), today.getMonth(),     1);
+  const nextD = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+  const k = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  const prevKey = k(prevD), curKey = k(curD), futureKey = k(nextD);
+  const columns = [
+    { key: prevKey,   synthetic: `${MONTH_NAMES_SHORT[prevD.getMonth()]} ${prevD.getFullYear()}`, isFuture: false },
+    { key: curKey,    synthetic: `${MONTH_NAMES_SHORT[curD.getMonth()]} ${curD.getFullYear()}`,   isFuture: false },
+    { key: futureKey, synthetic: `${MONTH_NAMES_SHORT[nextD.getMonth()]} ${nextD.getFullYear()}`, isFuture: true  }
+  ];
+  function bucketFor(whenStr) {
+    const m = monthKey(whenStr);
+    if (m === 'unscheduled') return 'unscheduled';
+    if (m === prevKey) return prevKey;
+    if (m === curKey)  return curKey;
+    if (m >= futureKey) return futureKey;
+    return null; // before window — drop
+  }
+  return { columns, bucketFor, prevKey, curKey, futureKey };
+}
+
 // ─── Timeline (grouped by Month) ───────────────────────────────────────
 // Column STRUCTURE is built from STATE.rows (unfiltered) so the columns stay
 // stable across filter changes — only the cards inside change. Columns with
@@ -641,33 +669,28 @@ function renderTimeline() {
   // Backlog rows live in their own tab — exclude from Timeline entirely.
   const timelineRows = STATE.rows.filter(r => !isBacklogRow(r));
 
-  // Fixed 3-column window: previous, current, next month relative to today.
-  // Rows scheduled outside this window are intentionally not shown here.
-  const today = new Date();
-  const windowMonths = [-1, 0, 1].map(offset => {
-    const d = new Date(today.getFullYear(), today.getMonth() + offset, 1);
-    return { year: d.getFullYear(), month: d.getMonth() + 1 };
-  });
-  const windowKeys = windowMonths.map(m => `${m.year}-${String(m.month).padStart(2, '0')}`);
-  const inWindow = (r) => windowKeys.indexOf(monthKey(r.When)) !== -1;
+  // Fixed 3-bucket window: previous · current · next + everything later.
+  const win = timelineWindow();
+  const inWindow = (r) => {
+    const b = win.bucketFor(r.When);
+    return b && b !== 'unscheduled';
+  };
 
   const windowRows = timelineRows.filter(inWindow);
   const filtered = applyTimelineFilters(windowRows);
 
   // Always render all 3 columns, even if empty, so the structure is stable.
   const groups = {};
-  windowMonths.forEach((m, i) => {
-    const key = windowKeys[i];
-    const synthetic = `${MONTH_NAMES_SHORT[m.month - 1]} ${m.year}`;
-    groups[key] = { label: monthLabel(synthetic), allRows: [], rows: [] };
+  win.columns.forEach(col => {
+    groups[col.key] = { label: monthLabel(col.synthetic), isFuture: col.isFuture, allRows: [], rows: [] };
   });
   windowRows.forEach(r => {
-    const key = monthKey(r.When);
-    if (groups[key]) groups[key].allRows.push(r);
+    const b = win.bucketFor(r.When);
+    if (groups[b]) groups[b].allRows.push(r);
   });
   filtered.forEach(r => {
-    const key = monthKey(r.When);
-    if (groups[key]) groups[key].rows.push(r);
+    const b = win.bucketFor(r.When);
+    if (groups[b]) groups[b].rows.push(r);
   });
 
   // Filter-count chip: how many cards survived the filter (only when active)
@@ -679,8 +702,8 @@ function renderTimeline() {
     countEl.textContent = `${filtered.length} of ${windowRows.length}`;
   }
 
-  // Fixed prev → current → next order
-  const sortedKeys = windowKeys;
+  // Fixed prev → current → future order
+  const sortedKeys = win.columns.map(c => c.key);
 
   document.getElementById('timelineColumns').innerHTML = sortedKeys.map(key => {
     const g = groups[key];
@@ -691,7 +714,7 @@ function renderTimeline() {
       // skips past them instead of treating them as empty source data
       hasAny && g.rows.length === 0 ? 'is-filtered-out' : ''
     ].filter(Boolean).join(' ');
-    const suffix = g.label.isNow ? ' · Now' : '';
+    const suffix = g.label.isNow ? ' · Now' : (g.isFuture ? ' & beyond' : '');
     // Count badge: when a filter is active, show "visible/total" so users
     // can see how many cards are hidden in each month at a glance.
     const countText = hasAny
@@ -734,31 +757,37 @@ function renderBacklog() {
     return;
   }
 
-  // Group by When (month) — backlog rows can still have a defined timeline,
-  // so the Backlog tab mirrors the Timeline's column layout. Rows without a
-  // parsable When fall into the "No timeline yet" column.
+  // Mirror the Timeline's column layout: prev · current · next & beyond,
+  // plus an "unscheduled" column for backlog rows with no defined When.
+  const win = timelineWindow();
   const groups = {};
+  win.columns.forEach(col => {
+    groups[col.key] = { label: monthLabel(col.synthetic), isFuture: col.isFuture, rows: [] };
+  });
+  // Unscheduled bucket — built lazily so the column only appears when needed
+  let unscheduled = null;
   backlogRows.forEach(r => {
-    const key = monthKey(r.When);
-    if (!groups[key]) groups[key] = { label: monthLabel(r.When), rows: [] };
-    groups[key].rows.push(r);
+    const b = win.bucketFor(r.When);
+    if (b === 'unscheduled') {
+      if (!unscheduled) unscheduled = { label: { text: 'No timeline yet', isNow: false, isPast: false }, isFuture: false, rows: [] };
+      unscheduled.rows.push(r);
+      return;
+    }
+    if (!groups[b]) return; // before the window — drop
+    groups[b].rows.push(r);
   });
 
-  const sortedKeys = Object.keys(groups).sort((a, b) => {
-    if (a === 'unscheduled') return 1;
-    if (b === 'unscheduled') return -1;
-    return a.localeCompare(b);
-  });
+  const sortedCols = win.columns.map(c => groups[c.key]);
+  if (unscheduled) sortedCols.push(unscheduled);
 
   grid.innerHTML = `
     <div class="timeline">
-      ${sortedKeys.map(key => {
-        const g = groups[key];
+      ${sortedCols.map(g => {
         const cls = [
           g.label.isNow  ? 'is-now'  : '',
           g.label.isPast ? 'is-past' : ''
         ].filter(Boolean).join(' ');
-        const suffix = g.label.isNow ? ' · Now' : '';
+        const suffix = g.label.isNow ? ' · Now' : (g.isFuture ? ' & beyond' : '');
         return `
           <div class="timeline-col ${cls}">
             <div class="timeline-col-head">

@@ -4,20 +4,21 @@
  *
  * "Stay signed in" model:
  *   - Google's own ID tokens carry a ~1h `exp`; we can't extend that.
- *   - We keep an APP-LEVEL session window of 24h, anchored to the original
- *     sign-in. While inside that window we silently refresh the token via
- *     GIS auto_select (no user click) every ~50 min, so the cached token
- *     stays accepted by the backend.
- *   - If the user's Google session itself ends inside that 24h, the silent
- *     refresh will fail and we fall back to the interactive sign-in button.
+ *   - We keep an APP-LEVEL session window of 30 days, anchored to the
+ *     original sign-in. While inside that window we silently refresh the
+ *     token via GIS auto_select (no user click) every ~5 min, so the
+ *     cached token stays accepted by the backend.
+ *   - If the user's Google session itself ends inside that 30 days, the
+ *     silent refresh will fail and we fall back to the interactive sign-in
+ *     button.
  *
  * Configure OAUTH_CLIENT_ID and API_URL in app.js (CONFIG object).
  */
 
 window.AUTH = (function () {
   const STORAGE_KEY    = 'roadmap_idToken_v1';
-  const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 h "stay signed in" window
-  const REFRESH_PERIOD = 50 * 60 * 1000;       // refresh ~10 min before exp
+  const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 d "stay signed in" window
+  const REFRESH_PERIOD = 5 * 60 * 1000;             // refresh every 5 min
 
   let idToken = null;
   let email = null;
