@@ -18,7 +18,7 @@ const STATE = {
   objectives: [],
   view: 'timeline',
   fetchedAt: 0,
-  filters: { objective: '', owner: '', status: '', tech: '', quality: '' }, // Timeline filters; '' = no filter
+  filters: { project: '', objective: '', owner: '', status: '', tech: '', quality: '' }, // Timeline filters; '' = no filter
   synthesis: {
     stakeholder: { text: '', generatedAt: 0 },
     operational: { text: '', generatedAt: 0 }
@@ -415,12 +415,36 @@ function renderMetrics() {
   `).join('');
 }
 
-// ─── Timeline filters (Owner / Status / Card quality) ─────────────────
+// Project = a heuristic grouping that scans Objective + What + How for
+// keywords. A row can match multiple projects; the filter only requires
+// one match against the chosen project's keyword list (case-insensitive,
+// whole-word-ish via word boundaries so "kyc" doesn't match "skycraper").
+const PROJECT_KEYWORDS = {
+  'Family Hub': ['family hub', 'family', 'children', 'parent'],
+  'Account':    ['account', 'register', 'authentication', 'terminate'],
+  'Activation': ['activation', 'map bank', 'mapbank', 'kyc', 'ekyc']
+};
+function rowMatchesProject(r, project) {
+  const keywords = PROJECT_KEYWORDS[project];
+  if (!keywords) return true;
+  const haystack = [r.Objective, r.What, r.How]
+    .map(s => String(s || '').toLowerCase()).join(' \n ');
+  return keywords.some(k => {
+    const kw = k.toLowerCase();
+    // Word boundaries via simple lookaround on letters/digits — avoids
+    // matching mid-word (e.g. "kyc" inside "skycraper" would not pass).
+    const re = new RegExp(`(^|[^a-z0-9])${kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z0-9]|$)`, 'i');
+    return re.test(haystack);
+  });
+}
+
+// ─── Timeline filters (Project / Owner / Status / Tech / Card quality) ─
 // "Card quality" buckets initiatives by completeness of KEY_FIELDS:
 //   complete = no missing fields, gaps = at least one missing.
 function applyTimelineFilters(rows) {
   const f = STATE.filters;
   return rows.filter(r => {
+    if (f.project   && !rowMatchesProject(r, f.project))           return false;
     if (f.objective && (r.Objective || '').trim() !== f.objective) return false;
     if (f.owner  && (r.Who    || '').trim() !== f.owner)  return false;
     if (f.status && (r.Status || '').trim() !== f.status) return false;
@@ -449,11 +473,18 @@ function populateTimelineFilters() {
     STATE.rows.map(r => (r.Status || '').trim()).filter(Boolean)
   )).sort((a, b) => a.localeCompare(b));
 
+  const projectSel   = document.getElementById('filterProject');
   const objectiveSel = document.getElementById('filterObjective');
   const ownerSel  = document.getElementById('filterOwner');
   const statusSel = document.getElementById('filterStatus');
   const techSel   = document.getElementById('filterTech');
   const qSel      = document.getElementById('filterQuality');
+  if (projectSel) {
+    // Static option set; no dynamic populate needed. Just sync selection
+    // and bind the change handler each rebuild.
+    projectSel.value = STATE.filters.project || '';
+    projectSel.onchange = (e) => onFilterChange('project', e.target.value);
+  }
   if (objectiveSel) {
     const cur = STATE.filters.objective;
     objectiveSel.innerHTML = '<option value="">Objective</option>' +
@@ -503,7 +534,8 @@ function populateTimelineFilters() {
   }
   const clearBtn = document.getElementById('clearFiltersBtn');
   if (clearBtn) clearBtn.onclick = () => {
-    STATE.filters = { objective: '', owner: '', status: '', tech: '', quality: '' };
+    STATE.filters = { project: '', objective: '', owner: '', status: '', tech: '', quality: '' };
+    if (projectSel)   projectSel.value   = '';
     if (objectiveSel) objectiveSel.value = '';
     if (ownerSel)     ownerSel.value     = '';
     if (statusSel)    statusSel.value    = '';
@@ -518,7 +550,7 @@ function populateTimelineFilters() {
 
 function updateClearFiltersBtn() {
   const f = STATE.filters;
-  const hasAny = !!(f.objective || f.owner || f.status || f.tech || f.quality);
+  const hasAny = !!(f.project || f.objective || f.owner || f.status || f.tech || f.quality);
   const btn = document.getElementById('clearFiltersBtn');
   if (btn) btn.hidden = !hasAny;
 }
@@ -696,7 +728,7 @@ function renderTimeline() {
 
   // Filter-count chip: how many cards survived the filter (only when active)
   const f = STATE.filters;
-  const hasAny = !!(f.objective || f.owner || f.status || f.tech || f.quality);
+  const hasAny = !!(f.project || f.objective || f.owner || f.status || f.tech || f.quality);
   const countEl = document.getElementById('filterCount');
   if (countEl) {
     countEl.hidden = !hasAny;
