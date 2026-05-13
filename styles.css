@@ -887,34 +887,31 @@ a:hover { text-decoration: underline; }
   color: var(--red);
 }
 
-/* Foot bar — submit + cancel */
+/* Foot bar — delete (icon, far left) + cancel/submit (right) */
 .idea-form-foot {
-  display: flex; justify-content: space-between; align-items: center;
-  gap: 12px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 8px;
   padding-top: 16px; margin-top: 8px;
   border-top: 1px solid var(--border);
 }
-.idea-form-foot-left {
-  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-}
-.idea-meta-inline { font-size: 12px; color: var(--ink-3); }
-.idea-meta-inline strong { color: var(--ink-2); font-weight: 600; }
-.idea-form-actions { display: flex; gap: 8px; align-items: center; }
+/* Push the actions cluster to the right whether or not the delete icon
+   is present (hidden button = no flex item, so we use margin-left:auto). */
+.idea-form-actions { display: flex; gap: 8px; align-items: center; margin-left: auto; }
 
-/* Delete card — destructive action, only shown in edit mode for allowlisted users */
-.delete-link {
-  display: inline-flex; align-items: center; gap: 6px;
-  color: var(--red); font-size: 12px; font-weight: 500;
-  padding: 4px 8px; border-radius: 4px;
+/* Delete card — icon-only, destructive. Tooltip carries the label.
+   Only shown in edit mode for allowlisted users. */
+.btn-delete-icon {
+  width: 32px; height: 32px;
+  display: inline-flex; align-items: center; justify-content: center;
   background: transparent; border: 1px solid transparent;
-  cursor: pointer;
+  border-radius: 4px; cursor: pointer;
+  font-size: 15px; line-height: 1; color: var(--red);
+  opacity: 0.7; transition: opacity 0.12s ease, background 0.12s ease;
 }
-.delete-link:hover {
+.btn-delete-icon:hover {
+  opacity: 1;
   background: rgba(192, 57, 43, 0.08);
-  border-color: rgba(192, 57, 43, 0.2);
 }
-.delete-link:disabled { opacity: 0.5; cursor: not-allowed; }
-.delete-link .delete-icon { font-size: 14px; line-height: 1; }
+.btn-delete-icon:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Error banner inside form */
 .idea-form .form-error {
@@ -1148,16 +1145,23 @@ a:hover { text-decoration: underline; }
   font-weight: 400; margin: 0; color: var(--ink);
 }
 .modal-head-actions { display: inline-flex; align-items: center; gap: 4px; }
-/* Subtle inline link variant — used in the form footer */
-.copy-link {
-  font-size: 12px; color: var(--ink-3); padding: 4px 6px;
-  margin-right: auto;
-  transition: color 0.12s ease;
+/* Top-right toolbar cluster — holds utility actions (e.g. Copy) next to the
+   close button. Replaces the older approach of crowding the form footer. */
+.modal-toolbar {
+  position: absolute; top: 8px; right: 10px;
+  display: inline-flex; align-items: center; gap: 2px;
 }
-.copy-link:hover { color: var(--momo); }
+.toolbar-link {
+  font-size: 12px; color: var(--ink-3);
+  background: transparent; border: 0; cursor: pointer;
+  padding: 4px 8px; border-radius: 4px;
+  font-family: inherit;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+.toolbar-link:hover { color: var(--momo); background: var(--surface); }
 
-/* Floating close button — sits in the top-right corner of a modal card
-   when the dedicated header bar is removed. */
+/* Floating close button — top-right corner when standalone, or part of a
+   toolbar cluster when nested in .modal-toolbar (positioning is overridden). */
 .modal-close-floating {
   position: absolute; top: 8px; right: 10px;
   width: 28px; height: 28px;
@@ -1168,6 +1172,7 @@ a:hover { text-decoration: underline; }
   z-index: 2;
 }
 .modal-close-floating:hover { background: var(--surface); color: var(--ink); }
+.modal-toolbar .modal-close-floating { position: static; }
 
 /* a11y utility — visually hide while keeping for screen readers */
 .visually-hidden {

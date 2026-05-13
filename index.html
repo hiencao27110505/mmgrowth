@@ -124,7 +124,10 @@
     <div class="modal-backdrop" data-submit-close></div>
     <div class="modal-card submit-modal-card" role="dialog" aria-labelledby="submitModalTitle">
       <h2 id="submitModalTitle" class="visually-hidden">Submit an idea</h2>
-      <button class="modal-close-floating" data-submit-close aria-label="Close">×</button>
+      <div class="modal-toolbar">
+        <button type="button" id="submitCopyBtn" class="toolbar-link" title="Copy as prototype prompt">Copy</button>
+        <button class="modal-close-floating" data-submit-close aria-label="Close">×</button>
+      </div>
       <form id="submitForm" class="idea-form">
         <div class="idea-field-row">
           <div class="idea-field" style="flex: 2;">
@@ -242,15 +245,10 @@
         <div id="formError" class="form-error" hidden></div>
 
         <div class="idea-form-foot">
-          <div class="idea-form-foot-left">
-            <button type="button" id="deleteCardBtn" class="btn btn-link delete-link" title="Delete this card" hidden>
-              <span class="delete-icon" aria-hidden="true">🗑</span>
-              <span>Delete card</span>
-            </button>
-            <span class="idea-meta-inline">As <strong id="submitterEmail"></strong></span>
-          </div>
+          <button type="button" id="deleteCardBtn" class="btn-delete-icon" title="Delete this card" aria-label="Delete card" hidden>
+            <span aria-hidden="true">🗑</span>
+          </button>
           <div class="idea-form-actions">
-            <button type="button" id="submitCopyBtn" class="btn btn-link copy-link" title="Copy as prototype prompt">Copy</button>
             <button type="button" class="btn btn-link" data-submit-close>Cancel</button>
             <button type="submit" class="btn btn-primary" id="submitFormBtn">Submit idea</button>
           </div>

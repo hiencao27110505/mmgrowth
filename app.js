@@ -78,7 +78,6 @@ function showApp(email) {
   document.getElementById('gate').hidden = true;
   document.getElementById('app').hidden = false;
   document.getElementById('viewerChip').textContent = email;
-  document.getElementById('submitterEmail').textContent = email;
 
   // Hide AI Insights tab for non-allowlisted users. Backend also enforces this.
   const insightsAllowed = INSIGHTS_ALLOWED.map(s => s.toLowerCase()).includes((email || '').toLowerCase());
