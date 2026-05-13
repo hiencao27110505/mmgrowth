@@ -187,6 +187,19 @@ function bindUI() {
   // (Timeline filter listeners attached inside populateTimelineFilters —
   // they need to survive each rebuild of the <select> options.)
 
+  // Click anywhere on the "Roadmap at a glance" section to copy it as a PNG.
+  // One-shot wiring: #roadmapGlance is a stable element re-populated in place
+  // by renderRoadmapGlance, so a single listener at boot survives every
+  // re-render. The chip-exclusion guard lets the per-chip handler (added
+  // inside renderRoadmapGlance) keep opening the detail modal.
+  const glanceEl = document.getElementById('roadmapGlance');
+  if (glanceEl) {
+    glanceEl.addEventListener('click', (e) => {
+      if (e.target.closest('.rg-chip')) return;
+      copyGlanceAsImage(glanceEl);
+    });
+  }
+
   // Detail modal close — delegated, so the listener is robust against
   // re-renders and works for any element under the modal carrying the
   // [data-detail-close] hook (backdrop, X button, future cancel links).
@@ -658,6 +671,7 @@ function renderRoadmapGlance() {
     <div class="rg-head">
       <h3 class="rg-title">Roadmap at a glance</h3>
       <span class="rg-meta">${objectives.length} objective${objectives.length === 1 ? '' : 's'} · ${monthKeys.length} month${monthKeys.length === 1 ? '' : 's'}</span>
+      <span class="glance-hint">Click to copy as image</span>
     </div>
     <div class="rg-grid">
       <div class="rg-headrow">
@@ -1995,4 +2009,59 @@ function toast(msg, isError) {
   el.hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { el.hidden = true; }, 4000);
+}
+
+// Rasterize the "Roadmap at a glance" section to a PNG and write it to the
+// clipboard. Renders an offscreen clone at a fixed 1200px width so the output
+// is consistent regardless of the user's viewport. Falls back to a PNG
+// download when the Clipboard API is unavailable or refused.
+async function copyGlanceAsImage(section) {
+  if (!window.htmlToImage) { toast('Image library not loaded yet — try again.', true); return; }
+  if (!section || section.hidden) return;
+
+  // Clone offscreen so the visible layout doesn't flicker mid-render.
+  const clone = section.cloneNode(true);
+  clone.style.width    = '1200px';
+  clone.style.maxWidth = 'none';
+  clone.style.position = 'fixed';
+  clone.style.left     = '-99999px';
+  clone.style.top      = '0';
+  // Hide the hover-only hint from the captured image
+  const hint = clone.querySelector('.glance-hint');
+  if (hint) hint.remove();
+  document.body.appendChild(clone);
+
+  try {
+    // Returns a Promise<Blob>; pass it directly to ClipboardItem so Safari
+    // accepts the write inside the same user-gesture turn.
+    const blobPromise = window.htmlToImage.toBlob(clone, {
+      pixelRatio: 2,
+      backgroundColor: '#f2eff0',
+      cacheBust: true
+    });
+
+    if (navigator.clipboard && window.ClipboardItem) {
+      try {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blobPromise })
+        ]);
+        toast('Roadmap copied as image.');
+        return;
+      } catch (_) { /* fall through to download */ }
+    }
+
+    // Fallback: download the PNG.
+    const blob = await blobPromise;
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'roadmap-glance.png';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('Saved as PNG (clipboard unavailable).');
+  } catch (err) {
+    console.error('copyGlanceAsImage failed', err);
+    toast('Copy failed.', true);
+  } finally {
+    clone.remove();
+  }
 }

@@ -655,7 +655,9 @@ a:hover { text-decoration: underline; }
   background: var(--white);
   border: 1px solid var(--border);
   border-radius: 8px;
+  cursor: copy;
 }
+.roadmap-glance .rg-chip { cursor: pointer; }
 .rg-head {
   display: flex; justify-content: space-between; align-items: baseline;
   gap: 12px; margin-bottom: 12px;
@@ -665,7 +667,13 @@ a:hover { text-decoration: underline; }
   font-size: 18px; font-weight: 400; color: var(--ink);
   margin: 0;
 }
-.rg-meta { font-size: 12px; color: var(--ink-3); }
+.rg-meta { font-size: 12px; color: var(--ink-3); margin-left: auto; }
+.glance-hint {
+  font-size: 11px; color: var(--ink-3);
+  opacity: 0; transition: opacity 0.15s ease;
+  user-select: none;
+}
+.roadmap-glance:hover .glance-hint { opacity: 1; }
 
 .rg-grid { display: flex; flex-direction: column; gap: 4px; }
 .rg-headrow, .rg-row {
