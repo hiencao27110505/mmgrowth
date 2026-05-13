@@ -667,11 +667,11 @@ function renderRoadmapGlance() {
     `;
   }).join('');
 
+  const cardCount = rows.length;
   host.innerHTML = `
     <div class="rg-head">
       <h3 class="rg-title">Roadmap at a glance</h3>
-      <span class="rg-meta">${objectives.length} objective${objectives.length === 1 ? '' : 's'} · ${monthKeys.length} month${monthKeys.length === 1 ? '' : 's'}</span>
-      <span class="glance-hint">Click to copy as image</span>
+      <span class="rg-meta">${objectives.length} objective${objectives.length === 1 ? '' : 's'} · ${cardCount} card${cardCount === 1 ? '' : 's'} · ${monthKeys.length} month${monthKeys.length === 1 ? '' : 's'}</span>
     </div>
     <div class="rg-grid">
       <div class="rg-headrow">
@@ -2012,38 +2012,29 @@ function toast(msg, isError) {
 }
 
 // Rasterize the "Roadmap at a glance" section to a PNG and write it to the
-// clipboard. Renders an offscreen clone at a fixed 1200px width so the output
-// is consistent regardless of the user's viewport. Falls back to a PNG
-// download when the Clipboard API is unavailable or refused.
+// clipboard. We hand the *original* visible section to html-to-image and let
+// it do its own internal cloning — passing a manually-cloned offscreen node
+// produced blank PNGs (layout/CSS-var resolution timing). The `style` option
+// overrides the clone's width to 1200px for a consistent shareable output.
 async function copyGlanceAsImage(section) {
   if (!window.htmlToImage) { toast('Image library not loaded yet — try again.', true); return; }
   if (!section || section.hidden) return;
 
-  // Clone offscreen so the visible layout doesn't flicker mid-render.
-  const clone = section.cloneNode(true);
-  clone.style.width    = '1200px';
-  clone.style.maxWidth = 'none';
-  clone.style.position = 'fixed';
-  clone.style.left     = '-99999px';
-  clone.style.top      = '0';
-  // Hide the hover-only hint from the captured image
-  const hint = clone.querySelector('.glance-hint');
-  if (hint) hint.remove();
-  document.body.appendChild(clone);
+  const opts = {
+    pixelRatio: 2,
+    backgroundColor: '#f2eff0',
+    width: 1200,
+    style: { width: '1200px', maxWidth: 'none' },
+    cacheBust: true
+  };
 
   try {
-    // Returns a Promise<Blob>; pass it directly to ClipboardItem so Safari
-    // accepts the write inside the same user-gesture turn.
-    const blobPromise = window.htmlToImage.toBlob(clone, {
-      pixelRatio: 2,
-      backgroundColor: '#f2eff0',
-      cacheBust: true
-    });
-
     if (navigator.clipboard && window.ClipboardItem) {
+      // Pass the Promise<Blob> directly to ClipboardItem so Safari accepts
+      // the write inside the same user-gesture turn.
       try {
         await navigator.clipboard.write([
-          new ClipboardItem({ 'image/png': blobPromise })
+          new ClipboardItem({ 'image/png': window.htmlToImage.toBlob(section, opts) })
         ]);
         toast('Roadmap copied as image.');
         return;
@@ -2051,9 +2042,10 @@ async function copyGlanceAsImage(section) {
     }
 
     // Fallback: download the PNG.
-    const blob = await blobPromise;
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
+    const blob = await window.htmlToImage.toBlob(section, opts);
+    if (!blob) throw new Error('toBlob returned null');
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement('a');
     a.href = url; a.download = 'roadmap-glance.png';
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -2061,7 +2053,5 @@ async function copyGlanceAsImage(section) {
   } catch (err) {
     console.error('copyGlanceAsImage failed', err);
     toast('Copy failed.', true);
-  } finally {
-    clone.remove();
   }
 }
