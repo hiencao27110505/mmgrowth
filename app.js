@@ -45,6 +45,14 @@ const EDITORS_ALLOWED = [
   'toan.tran1@mservice.com.vn'
 ];
 
+// Only these emails can delete cards (action=delete). Server-side enforced too.
+const DELETERS_ALLOWED = [
+  'hien.cao1@mservice.com.vn',
+  'trang.nguyen38@mservice.com.vn',
+  'hao.tang1@mservice.com.vn',
+  'khanh.ho@mservice.com.vn'
+];
+
 // ─── Boot ───────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   loadCachedSynthesis();
@@ -172,6 +180,10 @@ function bindUI() {
   if (submitCopyBtn) submitCopyBtn.addEventListener('click', copyIdeaFromForm);
   const detailCopyBtn = document.getElementById('detailCopyBtn');
   if (detailCopyBtn) detailCopyBtn.addEventListener('click', copyIdeaFromCurrentDetail);
+
+  // Delete button — only visible to allowlisted users in edit mode.
+  const deleteBtn = document.getElementById('deleteCardBtn');
+  if (deleteBtn) deleteBtn.addEventListener('click', handleDeleteCard);
 
   // (Timeline filter listeners attached inside populateTimelineFilters —
   // they need to survive each rebuild of the <select> options.)
@@ -396,7 +408,7 @@ function switchView(view) {
 // ─── Metrics row ────────────────────────────────────────────────────────
 function renderMetrics() {
   const total = STATE.rows.length;
-  const inProgress = STATE.rows.filter(r => /progress|doing|wip|building|develop/i.test(r.Status || '')).length;
+  const inProgress = STATE.rows.filter(r => /progress|doing|wip|building|develop|design|mockup|prototyp/i.test(r.Status || '')).length;
   const shipped    = STATE.rows.filter(r => /ship|done|launch|complete|live/i.test(r.Status || '')).length;
   const teams = new Set(STATE.rows.map(r => (r.Who || '').trim()).filter(Boolean)).size;
 
@@ -469,9 +481,14 @@ function populateTimelineFilters() {
   const owners = Array.from(new Set(
     STATE.rows.map(r => (r.Who || '').trim()).filter(Boolean)
   )).sort((a, b) => a.localeCompare(b));
-  const statuses = Array.from(new Set(
-    STATE.rows.map(r => (r.Status || '').trim()).filter(Boolean)
-  )).sort((a, b) => a.localeCompare(b));
+  // Union of statuses actually present in data + the canonical STATUS_OPTIONS,
+  // so newly-defined statuses (e.g. "Design") are filterable even when no
+  // row uses them yet. Preserve STATUS_OPTIONS order rather than alpha-sort
+  // so the dropdown reads as a workflow (Backlog → Discovery → Design → …).
+  const statusSet = new Set(STATE.rows.map(r => (r.Status || '').trim()).filter(Boolean));
+  STATUS_OPTIONS.forEach(s => statusSet.add(s));
+  const statuses = STATUS_OPTIONS.filter(s => statusSet.has(s))
+    .concat(Array.from(statusSet).filter(s => !STATUS_OPTIONS.includes(s)).sort((a, b) => a.localeCompare(b)));
 
   const projectSel   = document.getElementById('filterProject');
   const objectiveSel = document.getElementById('filterObjective');
@@ -790,28 +807,23 @@ function renderBacklog() {
     return;
   }
 
-  // Mirror the Timeline's column layout: prev · current · next & beyond,
-  // plus an "unscheduled" column for backlog rows with no defined When.
+  // Mirror the Timeline's column layout: prev · current · next & beyond.
+  // Backlog rows with no defined When fold into the "next & beyond" column
+  // alongside scheduled-future work, so there's a single forward-looking
+  // bucket instead of a separate "No timeline yet" column.
   const win = timelineWindow();
   const groups = {};
   win.columns.forEach(col => {
     groups[col.key] = { label: monthLabel(col.synthetic), isFuture: col.isFuture, rows: [] };
   });
-  // Unscheduled bucket — built lazily so the column only appears when needed
-  let unscheduled = null;
   backlogRows.forEach(r => {
-    const b = win.bucketFor(r.When);
-    if (b === 'unscheduled') {
-      if (!unscheduled) unscheduled = { label: { text: 'No timeline yet', isNow: false, isPast: false }, isFuture: false, rows: [] };
-      unscheduled.rows.push(r);
-      return;
-    }
+    let b = win.bucketFor(r.When);
+    if (b === 'unscheduled') b = win.futureKey;
     if (!groups[b]) return; // before the window — drop
     groups[b].rows.push(r);
   });
 
   const sortedCols = win.columns.map(c => groups[c.key]);
-  if (unscheduled) sortedCols.push(unscheduled);
 
   grid.innerHTML = `
     <div class="timeline">
@@ -894,14 +906,20 @@ function monthLabel(whenStr) {
 
 // ─── Card template (Timeline) ──────────────────────────────────────────
 // Minimal: objective label · title (2-line clamp) · why preview (3-line clamp)
-// · foot row of plain text (status, owner, when) + subtle Prototype link.
+// · foot row of plain text (status, owner, when) + subtle Docs / Prototype links.
 // Equal height across all cards. Click → opens detail modal with rich info.
 function initCardHTML(r) {
   const protoUrl = firstUrl(r.Prototype);
+  const docsUrl  = firstUrl(r.Confluence);
   const footParts = [];
   if (r.Status) footParts.push(`<span class="card-status ${statusClass(r.Status)}">${escapeHtml(r.Status)}</span>`);
   if (r.Who)    footParts.push(`<span class="card-foot-text">${escapeHtml(r.Who)}</span>`);
   const foot = footParts.join('<span class="card-foot-sep">·</span>');
+
+  const linkParts = [];
+  if (docsUrl)  linkParts.push(`<a class="card-link" href="${escapeAttr(docsUrl)}"  target="_blank" rel="noopener" onclick="event.stopPropagation()">Docs ↗</a>`);
+  if (protoUrl) linkParts.push(`<a class="card-link" href="${escapeAttr(protoUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Prototype ↗</a>`);
+  const linksWrap = linkParts.length ? `<div class="card-foot-links">${linkParts.join('')}</div>` : '';
 
   return `
     <div class="init-card" data-row='${escapeAttr(JSON.stringify(r))}'>
@@ -910,7 +928,7 @@ function initCardHTML(r) {
       <div class="init-card-why">${whyPreview(r.Why)}</div>
       <div class="init-card-foot">
         <div class="card-foot-meta">${foot}</div>
-        ${protoUrl ? `<a class="card-proto-link" href="${escapeAttr(protoUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Prototype ↗</a>` : ''}
+        ${linksWrap}
       </div>
     </div>
   `;
@@ -922,7 +940,7 @@ function statusPill(status) {
   if (!status) return `<span class="status-pill is-empty">no status</span>`;
   const cls = statusClass(status);
   // Filled variant for live/launched work — draws the eye to in-flight things
-  const isLive = /shipped|progress|doing|wip|building|develop|launch|done|complete|live/i.test(status);
+  const isLive = /shipped|progress|doing|wip|building|develop|launch|done|complete|live|design|mockup|prototyp/i.test(status);
   return `<span class="status-pill ${cls}${isLive ? ' is-filled' : ''}">${escapeHtml(status)}</span>`;
 }
 
@@ -1004,13 +1022,16 @@ function openSubmitModal(row) {
   // Adapt the modal's title and primary button based on mode
   const titleEl = document.getElementById('submitModalTitle');
   const submitBtn = document.getElementById('submitFormBtn');
+  const deleteBtn = document.getElementById('deleteCardBtn');
   if (CURRENT_EDIT_ROW) {
     if (titleEl)   titleEl.textContent   = 'Edit idea';
     if (submitBtn) submitBtn.textContent = 'Save changes';
+    if (deleteBtn) deleteBtn.hidden = !isDeleterViewer();
     prefillSubmitForm(CURRENT_EDIT_ROW);
   } else {
     if (titleEl)   titleEl.textContent   = 'Submit an idea';
     if (submitBtn) submitBtn.textContent = 'Submit idea';
+    if (deleteBtn) deleteBtn.hidden = true;
   }
 
   setTimeout(() => {
@@ -1207,6 +1228,51 @@ function closeSubmitModal() {
   }
 }
 
+async function handleDeleteCard() {
+  if (!CURRENT_EDIT_ROW) return;
+  if (!isDeleterViewer()) { toast('Not authorized to delete.', true); return; }
+  const r = CURRENT_EDIT_ROW;
+  const rowKey = r['#'];
+  if (!rowKey) { toast('This row has no "#" key — cannot delete.', true); return; }
+
+  const title = (r.What || '').trim() || '(no title)';
+  const ok = window.confirm(`Delete "${title}"?\n\nThis removes the row from the source sheet and cannot be undone.`);
+  if (!ok) return;
+
+  if (CONFIG.USE_MOCK) {
+    STATE.rows = STATE.rows.filter(x => String(x['#']) !== String(rowKey));
+    writeCachedData();
+    renderAll();
+    closeSubmitModal();
+    toast('Mock delete: row would be removed.');
+    return;
+  }
+
+  const btn = document.getElementById('deleteCardBtn');
+  if (btn) { btn.disabled = true; }
+  try {
+    const data = await jsonpCallWithReauth({
+      action: 'delete',
+      token:  AUTH.getToken(),
+      rowKey: String(rowKey)
+    });
+    if (!data.ok) throw new Error(data.error || 'delete failed');
+    STATE.rows = STATE.rows.filter(x => String(x['#']) !== String(rowKey));
+    STATE.objectives = Array.from(new Set(
+      STATE.rows.map(x => (x.Objective || '').trim()).filter(Boolean)
+    )).sort((a, b) => a.localeCompare(b));
+    writeCachedData();
+    populateTimelineFilters();
+    renderAll();
+    closeSubmitModal();
+    toast(`Deleted row #${rowKey}.`);
+  } catch (err) {
+    showFormError(err.message);
+  } finally {
+    if (btn) { btn.disabled = false; }
+  }
+}
+
 function firstUrl(cell) {
   if (!cell) return '';
   const m = String(cell).match(/https?:\/\/\S+/);
@@ -1225,6 +1291,7 @@ function statusClass(status) {
   if (/ship|done|launch|complete|live/.test(s))         return 'is-shipped';
   if (/progress|doing|building|wip|develop/.test(s))     return 'is-progress';
   if (/^backlog$/.test(s))                               return 'is-backlog';
+  if (/design|mockup|prototyp/.test(s))                  return 'is-design';
   if (/discov|explore|research|todo|planning/.test(s))   return 'is-discovery';
   if (/block|stuck|hold|paus/.test(s))                   return 'is-blocked';
   return '';
@@ -1247,13 +1314,18 @@ function bindCardClicks(scope) {
 // read-only summary of the same row.
 
 const MONTH_NAMES_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const STATUS_OPTIONS    = ['Backlog','Discovery','Doing','In review','Blocked','Shipped'];
+const STATUS_OPTIONS    = ['Backlog','Discovery','Design','Doing','In review','Blocked','Shipped'];
 // Track open card so the Save handler can diff against it
 let CURRENT_DETAIL_ROW = null;
 
 function isEditorViewer() {
   const viewerEmail = (AUTH.getEmail() || '').toLowerCase();
   return EDITORS_ALLOWED.map(s => s.toLowerCase()).includes(viewerEmail);
+}
+
+function isDeleterViewer() {
+  const viewerEmail = (AUTH.getEmail() || '').toLowerCase();
+  return DELETERS_ALLOWED.map(s => s.toLowerCase()).includes(viewerEmail);
 }
 
 function openDetailModal(r) {
@@ -1263,8 +1335,9 @@ function openDetailModal(r) {
 
   CURRENT_DETAIL_ROW = r;
   const protoUrl = firstUrl(r.Prototype);
+  const docsUrl  = firstUrl(r.Confluence);
   document.getElementById('detailModalTitle').textContent = r.What || '(no title)';
-  document.getElementById('detailModalBody').innerHTML = renderDetailReadonly(r, protoUrl);
+  document.getElementById('detailModalBody').innerHTML = renderDetailReadonly(r, protoUrl, docsUrl);
   document.getElementById('detailModal').hidden = false;
   document.body.style.overflow = 'hidden';
 }
@@ -1276,7 +1349,12 @@ function closeDetailModal() {
 }
 
 // Read-only view — used for non-editors.
-function renderDetailReadonly(r, protoUrl) {
+function renderDetailReadonly(r, protoUrl, docsUrl) {
+  const ctas = [
+    protoUrl ? `<a class="btn btn-primary" href="${escapeAttr(protoUrl)}" target="_blank" rel="noopener">View prototype ↗</a>` : '',
+    docsUrl  ? `<a class="btn btn-ghost"   href="${escapeAttr(docsUrl)}"  target="_blank" rel="noopener">View docs ↗</a>` : ''
+  ].filter(Boolean).join('');
+
   return `
     <div class="detail-modal-meta">
       ${r.Objective ? `<div class="detail-objective">${escapeHtml(r.Objective)}</div>` : ''}
@@ -1285,7 +1363,7 @@ function renderDetailReadonly(r, protoUrl) {
         ${r.Who  ? `<span class="owner-chip-static">${escapeHtml(r.Who)}</span>`  : `<span class="meta-empty">no owner</span>`}
         ${r.When ? `<span class="meta-when">${escapeHtml(r.When)}</span>`         : `<span class="meta-empty">no horizon</span>`}
       </div>
-      ${protoUrl ? `<a class="btn btn-primary detail-modal-cta" href="${escapeAttr(protoUrl)}" target="_blank" rel="noopener">View prototype ↗</a>` : ''}
+      ${ctas ? `<div class="detail-modal-cta">${ctas}</div>` : ''}
     </div>
     <div class="detail-modal-content">
       ${fieldOrPlaceholder('Why', r.Why)}

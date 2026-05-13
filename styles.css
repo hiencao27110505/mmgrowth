@@ -13,6 +13,7 @@
   --orange:     #d35400;
   --green:      #1a7a4a;
   --blue:       #2266aa;
+  --purple:     #6b3fa0;
 
   --radius:     6px;
   --shadow-sm:  0 1px 2px rgba(26, 17, 23, 0.04);
@@ -375,12 +376,16 @@ a:hover { text-decoration: underline; }
   display: inline;
 }
 .card-foot-meta > * { vertical-align: baseline; }
-.card-proto-link {
+.card-proto-link, .card-link {
   flex-shrink: 0;
   color: var(--momo); font-size: 11px; font-weight: 500;
   text-decoration: none;
 }
-.card-proto-link:hover { text-decoration: underline; }
+.card-proto-link:hover, .card-link:hover { text-decoration: underline; }
+.card-foot-links {
+  flex-shrink: 0;
+  display: inline-flex; gap: 12px; align-items: center;
+}
 .card-status {
   font-size: 10px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.3px;
@@ -388,6 +393,7 @@ a:hover { text-decoration: underline; }
 }
 .card-status.is-shipped  { color: var(--green); }
 .card-status.is-progress { color: var(--blue); }
+.card-status.is-design   { color: var(--purple); }
 .card-status.is-discovery{ color: var(--orange); }
 .card-status.is-blocked  { color: var(--red); }
 .card-status.is-backlog  { color: var(--momo); }
@@ -456,6 +462,7 @@ a:hover { text-decoration: underline; }
 }
 .status-pill.is-shipped  { color: var(--green);  border-color: var(--green); }
 .status-pill.is-progress { color: var(--blue);   border-color: var(--blue); }
+.status-pill.is-design   { color: var(--purple); border-color: var(--purple); }
 .status-pill.is-discovery{ color: var(--orange); border-color: var(--orange); }
 .status-pill.is-blocked  { color: var(--red);    border-color: var(--red); }
 .status-pill.is-empty {
@@ -467,6 +474,7 @@ a:hover { text-decoration: underline; }
 /* Filled variant — in-flight or shipped work gets a colored fill so the eye lands on active items */
 .status-pill.is-filled.is-shipped  { background: var(--green);  color: var(--white); border-color: var(--green); }
 .status-pill.is-filled.is-progress { background: var(--blue);   color: var(--white); border-color: var(--blue); }
+.status-pill.is-filled.is-design   { background: var(--purple); color: var(--white); border-color: var(--purple); }
 .status-pill.is-filled.is-discovery{ background: var(--orange); color: var(--white); border-color: var(--orange); }
 .status-pill.is-filled.is-blocked  { background: var(--red);    color: var(--white); border-color: var(--red); }
 
@@ -704,6 +712,7 @@ a:hover { text-decoration: underline; }
 .rg-chip:hover { background: var(--momo-light); border-color: var(--momo); }
 .rg-chip.is-shipped   { border-left-color: var(--green); }
 .rg-chip.is-progress  { border-left-color: var(--blue); }
+.rg-chip.is-design    { border-left-color: var(--purple); }
 .rg-chip.is-discovery { border-left-color: var(--orange); }
 .rg-chip.is-blocked   { border-left-color: var(--red); }
 .rg-chip.is-backlog   { border-left-color: var(--momo); }
@@ -885,9 +894,27 @@ a:hover { text-decoration: underline; }
   padding-top: 16px; margin-top: 8px;
   border-top: 1px solid var(--border);
 }
+.idea-form-foot-left {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
 .idea-meta-inline { font-size: 12px; color: var(--ink-3); }
 .idea-meta-inline strong { color: var(--ink-2); font-weight: 600; }
 .idea-form-actions { display: flex; gap: 8px; align-items: center; }
+
+/* Delete card — destructive action, only shown in edit mode for allowlisted users */
+.delete-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--red); font-size: 12px; font-weight: 500;
+  padding: 4px 8px; border-radius: 4px;
+  background: transparent; border: 1px solid transparent;
+  cursor: pointer;
+}
+.delete-link:hover {
+  background: rgba(192, 57, 43, 0.08);
+  border-color: rgba(192, 57, 43, 0.2);
+}
+.delete-link:disabled { opacity: 0.5; cursor: not-allowed; }
+.delete-link .delete-icon { font-size: 14px; line-height: 1; }
 
 /* Error banner inside form */
 .idea-form .form-error {
@@ -1017,10 +1044,12 @@ a:hover { text-decoration: underline; }
   margin-top: 8px;
 }
 .detail-modal-cta {
-  display: inline-block; margin-top: 14px;
+  display: inline-flex; gap: 8px; flex-wrap: wrap;
+  margin-top: 14px;
   text-decoration: none;
 }
-.detail-modal-cta:hover { text-decoration: none; }
+.detail-modal-cta > .btn { text-decoration: none; }
+.detail-modal-cta > .btn:hover { text-decoration: none; }
 
 /* ─── Detail modal — editable form ──────────────────────────────────── */
 .detail-edit-form .field { margin-bottom: 14px; }

@@ -140,6 +140,7 @@
             <select id="fStatus" name="fStatus">
               <option value="Backlog">Backlog</option>
               <option value="Discovery">Discovery</option>
+              <option value="Design">Design</option>
               <option value="Doing">Doing</option>
               <option value="In review">In review</option>
               <option value="Blocked">Blocked</option>
@@ -241,7 +242,13 @@
         <div id="formError" class="form-error" hidden></div>
 
         <div class="idea-form-foot">
-          <span class="idea-meta-inline">As <strong id="submitterEmail"></strong></span>
+          <div class="idea-form-foot-left">
+            <button type="button" id="deleteCardBtn" class="btn btn-link delete-link" title="Delete this card" hidden>
+              <span class="delete-icon" aria-hidden="true">🗑</span>
+              <span>Delete card</span>
+            </button>
+            <span class="idea-meta-inline">As <strong id="submitterEmail"></strong></span>
+          </div>
           <div class="idea-form-actions">
             <button type="button" id="submitCopyBtn" class="btn btn-link copy-link" title="Copy as prototype prompt">Copy</button>
             <button type="button" class="btn btn-link" data-submit-close>Cancel</button>
