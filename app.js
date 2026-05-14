@@ -2012,10 +2012,9 @@ function toast(msg, isError) {
 }
 
 // Rasterize the "Roadmap at a glance" section to a PNG and write it to the
-// clipboard. We hand the *original* visible section to html-to-image and let
-// it do its own internal cloning — passing a manually-cloned offscreen node
-// produced blank PNGs (layout/CSS-var resolution timing). The `style` option
-// overrides the clone's width to 1200px for a consistent shareable output.
+// clipboard — true-screenshot semantics: capture the section exactly as it's
+// laid out on screen (no forced width, no reflow). `pixelRatio: 2` keeps text
+// sharp when pasted into retina destinations (Slack, Confluence, decks).
 async function copyGlanceAsImage(section) {
   if (!window.htmlToImage) { toast('Image library not loaded yet — try again.', true); return; }
   if (!section || section.hidden) return;
@@ -2023,8 +2022,6 @@ async function copyGlanceAsImage(section) {
   const opts = {
     pixelRatio: 2,
     backgroundColor: '#f2eff0',
-    width: 1200,
-    style: { width: '1200px', maxWidth: 'none' },
     cacheBust: true
   };
 
