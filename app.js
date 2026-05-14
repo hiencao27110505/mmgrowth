@@ -1249,7 +1249,7 @@ async function handleDeleteCard() {
   if (!rowKey) { toast('This row has no "#" key — cannot delete.', true); return; }
 
   const title = (r.What || '').trim() || '(no title)';
-  const ok = window.confirm(`Delete "${title}"?\n\nThis removes the row from the source sheet and cannot be undone.`);
+  const ok = window.confirm(`Delete "${title}"?\n\nThe row is hidden from the app but kept in the sheet — to restore, clear its "Deleted" cell in the What&Why tab.`);
   if (!ok) return;
 
   if (CONFIG.USE_MOCK) {
@@ -1270,6 +1270,14 @@ async function handleDeleteCard() {
       rowKey: String(rowKey)
     });
     if (!data.ok) throw new Error(data.error || 'delete failed');
+    // Guard against a stale Apps Script deploy: when the deployed backend
+    // doesn't recognize action=delete, doGet falls through to the read branch
+    // and returns { ok:true, rows:[...] }. The sheet is untouched but the UI
+    // would optimistically remove the row, then it reappears on refresh.
+    // A genuine delete response echoes rowKey and never includes a rows array.
+    if (!('rowKey' in data) || Array.isArray(data.rows)) {
+      throw new Error('Apps Script delete endpoint not deployed — redeploy the script (Manage deployments → New version).');
+    }
     STATE.rows = STATE.rows.filter(x => String(x['#']) !== String(rowKey));
     STATE.objectives = Array.from(new Set(
       STATE.rows.map(x => (x.Objective || '').trim()).filter(Boolean)
